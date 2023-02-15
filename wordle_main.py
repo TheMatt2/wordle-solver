@@ -1,4 +1,3 @@
-import time
 import wordle_solver
 import wordle_contexts
 
@@ -26,6 +25,17 @@ def print_best_guesses(guesses, count = 10):
         if not count: break
     print()
 
+def is_result(result):
+    # Check if this is a valid result
+    # 5 letters, bgy
+    if len(result) != 5:
+        return False
+
+    if not {"b", "g", "y"}.issuperset(result):
+        return False
+
+    return True
+
 def main():
     # Select Word List
     context = choose_context()
@@ -35,7 +45,9 @@ def main():
     print(f"Loaded {len(solutions)} possible solutions.")
 
     naive = input(
-        "Should the computer play naively (assume any word can be a solution)?: ") == "y"
+        "Should the computer play naively (assume any word can be a solution)?: "
+        ).strip() == "y"
+
     if naive:
         solutions = word_list
 
@@ -63,9 +75,25 @@ def main():
     print("Words Remaining:", len(word_stats))
 
     while True:
-        # TODO validate inputs and reprompt if incorrect
-        word = input("Word: ").strip()
-        result = input("Result: ").strip()
+        while True:
+            word = input("Word: ").strip()
+
+            if word in word_list:
+                # Valid, exit
+                break
+
+            if input(
+                f"{word!r} is not in the word list. Use this word anyway? (y/n): "
+                ).strip() == "y":
+                break
+
+        while True:
+            result = input("Result: ").strip()
+            if is_result(result):
+                # Valid, exit
+                break
+
+            print(f"{result!r} is not a valid result. Please enter result again.")
 
         if result == "ggggg":
             print("Success!")
@@ -95,6 +123,11 @@ def main():
             # Only one solution
             word = next(iter(word_stats))
             print("Best Next Guess:", word)
+            break
+
+        if len(word_stats) == 0:
+            # No remaining solutions
+            print("There are no possible remaining solutions.")
             break
 
         guesses, rank = wordle_solver.best_guesses(word_list, word_stats)
