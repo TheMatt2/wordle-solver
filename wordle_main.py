@@ -50,7 +50,7 @@ def is_result(result):
 def main():
     # Select Word List
     context = choose_context()
-    solutions, word_list = wordle_contexts.get_solutions_word_list(context)
+    solutions, word_list = wordle_contexts.load_solutions_word_list(context)
 
     print(f"Loaded {len(word_list)} words.")
     print(f"Loaded {len(solutions)} possible solutions.")
@@ -64,18 +64,14 @@ def main():
 
     word_stats = wordle_solver.WordStats(solutions)
 
-    if naive:
-        guesses = wordle_contexts.get_naive_guesses(context)
-    else:
-        guesses = wordle_contexts.get_smart_guesses(context)
+    # "guesses" is the initial guess for this Wordle game
+    # without knowing any information specific to this game
+    guesses = wordle_contexts.load_guesses(context, naive)
 
     if not guesses:
+        # Generate initial guesses
         guesses, _ = wordle_solver.best_guesses(word_list, word_stats)
-
-        if naive:
-            wordle_contexts.set_naive_guesses(context, guesses)
-        else:
-            wordle_contexts.set_smart_guesses(context, guesses)
+        wordle_contexts.save_guesses(context, naive, guesses)
 
     print_best_guesses(guesses)
     guesses.sort()

@@ -30,7 +30,7 @@ def get_contexts():
 def get_common_name(context):
     return WORDLE_CONTEXTS_COMMON_NAME[context]
 
-def get_solutions_word_list(context):
+def load_solutions_word_list(context):
     # Check if word list exists
     solutions_file = os.path.join(
         WORDLE_CACHE, WORDLE_SOLUTIONS_FILE_FORMAT.format(context))
@@ -68,28 +68,55 @@ def get_solutions_word_list(context):
 
     return solutions, word_list
 
-def get_naive_guesses(context):
-    naive_file = os.path.join(
-        WORDLE_CACHE, WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(context))
-    if os.path.isfile(naive_file):
-        with open(naive_file) as f:
+# def get_naive_guesses(context):
+#     naive_file = os.path.join(
+#         WORDLE_CACHE, WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(context))
+#     if os.path.isfile(naive_file):
+#         with open(naive_file) as f:
+#             return json.load(f)
+
+# def set_naive_guesses(context, guesses):
+#     naive_file = os.path.join(
+#         WORDLE_CACHE, WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(context))
+#     with open(naive_file, "w") as f:
+#         json.dump(guesses, f)
+
+# def get_smart_guesses(context):
+#     smart_file = os.path.join(
+#         WORDLE_CACHE, WORDLE_SMART_GUESSES_FILE_FORMAT.format(context))
+#     if os.path.isfile(smart_file):
+#         with open(smart_file) as f:
+#             return json.load(f)
+
+# def set_smart_guesses(context, guesses):
+#     smart_file = os.path.join(
+#         WORDLE_CACHE, WORDLE_SMART_GUESSES_FILE_FORMAT.format(context))
+#     with open(smart_file, "w") as f:
+#         json.dump(guesses, f)
+
+def load_guesses(context, naive):
+    """Get the initial best guess for this context."""
+    if naive:
+        guesses_filename = WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(context)
+    else:
+        guesses_filename = WORDLE_SMART_GUESSES_FILE_FORMAT.format(context)
+
+    guesses_filename = os.path.join(WORDLE_CACHE, guesses_filename)
+
+    # If opening file fails, silently fail to indicate results invalid
+    try:
+        with open(guesses_filename) as f:
             return json.load(f)
+    except FileNotFoundError:
+        pass
 
-def set_naive_guesses(context, guesses):
-    naive_file = os.path.join(
-        WORDLE_CACHE, WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(context))
-    with open(naive_file, "w") as f:
-        json.dump(guesses, f)
+def save_guesses(context, naive, guesses):
+    """Set the initial best guess for this context."""
+    if naive:
+        guesses_filename = WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(context)
+    else:
+        guesses_filename = WORDLE_SMART_GUESSES_FILE_FORMAT.format(context)
 
-def get_smart_guesses(context):
-    smart_file = os.path.join(
-        WORDLE_CACHE, WORDLE_SMART_GUESSES_FILE_FORMAT.format(context))
-    if os.path.isfile(smart_file):
-        with open(smart_file) as f:
-            return json.load(f)
-
-def set_smart_guesses(context, guesses):
-    smart_file = os.path.join(
-        WORDLE_CACHE, WORDLE_SMART_GUESSES_FILE_FORMAT.format(context))
-    with open(smart_file, "w") as f:
+    guesses_filename = os.path.join(WORDLE_CACHE, guesses_filename)
+    with open(guesses_filename, "w") as f:
         json.dump(guesses, f)
