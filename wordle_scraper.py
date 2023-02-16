@@ -19,7 +19,9 @@ NYTIMES_WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
 NYTIMES_WORDLE_JS_CRIB = 'src="https://www.nytimes.com/games-assets/v2/wordle.'
 
 # Known values of wordlists to find them in html / javascript
-NYTIMES_SOLUTIONS_CRIB = '["cigar","rebut","sissy",'
+# NYTIMES_SOLUTIONS_CRIB = '["cigar","rebut","sissy",' # September, 2022
+NYTIMES_SOLUTIONS_CRIB = '"cigar","rebut","sissy",' # February, 2023, Solutions are present, but not the start of the array
+
 # NYTIMES_WORD_LIST_CRIB = '["aahed","aalii","aargh",' # June, 2022
 NYTIMES_WORD_LIST_CRIB = '["aahed","aalii","aapas",' # September, 2022
 
@@ -48,6 +50,11 @@ def scrap_nytimes():
     solutions_stop = wordle_js.index("]", solutions_start) + 1
 
     solutions_raw = wordle_js[solutions_start:solutions_stop]
+
+    # If list does not begin with a bracket, add it
+    if solutions_raw[0] != "[":
+        solutions_raw = "[" + solutions_raw
+
     solutions = json.loads(solutions_raw)
 
     # Get word list
@@ -57,8 +64,9 @@ def scrap_nytimes():
     word_list_raw = wordle_js[word_list_start:word_list_stop]
     word_list = json.loads(word_list_raw)
 
-    # NYT word list does not include any of the solutions
-    word_list = word_list + solutions
+    # # NYT word list does not include any of the solutions
+    # word_list = word_list + solutions
+    # Feb 2023, the word list now contains solutions, just not sorted
     return solutions, word_list
 
 WORDLEGAME_WORD_LIST_URL = "https://wordlegame.org/files/wordle/en/dictionary.json" # September 2022, v39.67
