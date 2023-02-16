@@ -13,10 +13,21 @@ def choose_context():
     for i in range(len(contexts)):
         print(f"{i+1}) {wordle_contexts.get_common_name(contexts[i])}")
 
-    # TODO properly bounds check input
-    choice = input("Wordle version: ")
-    context = contexts[int(choice)-1]
-    return context
+    # Have user choose wordle version
+    while True:
+        choice = input("Wordle version: ").strip()
+
+        if not choice.isdigit():
+            print(f"Invalid wordle version choice {choice!r}")
+            continue
+
+        choice = int(choice)
+
+        if choice > len(contexts):
+            print(f"Invalid wordle version choice {choice!r}")
+            continue
+
+        return contexts[choice - 1]
 
 def print_best_guesses(guesses, count = 10):
     for guess in sorted(guesses):

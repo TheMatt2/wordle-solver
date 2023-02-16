@@ -6,15 +6,17 @@ import json
 
 import wordle_scraper
 
-WORDLE_CONTEXTS = ["new_york_times", "wordlegame_org"]
+WORDLE_CONTEXTS = ["new_york_times", "wordlegame_org", "flappy_birdle"]
 
 WORDLE_CONTEXTS_COMMON_NAME = {
     "new_york_times": "New York Times Wordle",
-    "wordlegame_org": "wordlegame.org Wordle"}
+    "wordlegame_org": "wordlegame.org Wordle",
+    "flappy_birdle": "Flappy Birdle"}
 
 WORDLE_CONTEXTS_SCRAPER = {
     "new_york_times": wordle_scraper.scrap_nytimes,
-    "wordlegame_org": wordle_scraper.scrap_wordlegame}
+    "wordlegame_org": wordle_scraper.scrap_wordlegame,
+    "flappy_birdle": wordle_scraper.scrap_flappy_birdle}
 
 WORDLE_CACHE = "cache"
 WORDLE_SOLUTIONS_FILE_FORMAT = "solutions_{}.txt"

@@ -44,8 +44,9 @@ class WordStats:
                     self.word_breakdown[index][letter])
 
         # Letter count
-        # Range [1, 2, 3] # Because no letter is repeated more than 3 times
-        self.letter_count = {v: {k: set() for k in range(1,4)} for v in letters}
+        # Create a bucket for each letter and count of that letter in word
+        # Note that some buckets will always be empty
+        self.letter_count = {v: {k: set() for k in range(1, word_length)} for v in letters}
         for word in self.word_list:
             for letter in set(word):
                 letter_count = word.count(letter)

@@ -10,18 +10,22 @@ Two Wordle Games are currently supported:
 
 import json
 import requests
+import itertools
+import urllib.parse
 
 letters = "abcdefghijklmnopqrstuvwxyz"
 
-# Known values of wordlists to find them in html / javascript
+NYTIMES_WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
 NYTIMES_WORDLE_JS_CRIB = 'src="https://www.nytimes.com/games-assets/v2/wordle.'
+
+# Known values of wordlists to find them in html / javascript
 NYTIMES_SOLUTIONS_CRIB = '["cigar","rebut","sissy",'
 # NYTIMES_WORD_LIST_CRIB = '["aahed","aalii","aargh",' # June, 2022
 NYTIMES_WORD_LIST_CRIB = '["aahed","aalii","aapas",' # September, 2022
 
 def scrap_nytimes():
     # Grab wordle homepage and extract link to javascript
-    wordle_page = requests.get("https://www.nytimes.com/games/wordle/index.html").text
+    wordle_page = requests.get(NYTIMES_WORDLE_URL).text
 
     # Go to crib
     js_crib_index = wordle_page.index(NYTIMES_WORDLE_JS_CRIB)
@@ -113,3 +117,45 @@ def check_solutions_word_lists(solutions, word_list):
     if not word_list_set.issuperset(solutions_set):
         raise ValueError(
             "Not all solutions are in word list")
+
+FLAPPY_BIRDLE_URL = "https://flappybirdle.com"
+FLAPPY_BIRDLE_JS_CRIB = 'src="/static/js/main.'
+
+# Known values of wordlists to find them in html / javascript
+FLAPPY_BIRDLE_SOLUTIONS_CRIB = '["cigar","rebut","sissy",'
+
+def scrap_flappy_birdle():
+    # Grab wordle homepage and extract link to javascript
+    wordle_page = requests.get(FLAPPY_BIRDLE_URL).text
+
+    # Go to crib
+    js_crib_index = wordle_page.index(FLAPPY_BIRDLE_JS_CRIB)
+    # Jump to start of url
+    js_url_start = wordle_page.index('"', js_crib_index) + 1
+    # Get url end
+    js_url_stop = wordle_page.index('"', js_url_start)
+
+    # Extract javascript file
+    js_url = wordle_page[js_url_start:js_url_stop]
+    assert js_url.endswith(".js"), "failed to extract Birdle javascript URL"
+
+    js_url = urllib.parse.urljoin(FLAPPY_BIRDLE_URL, js_url)
+    # print("Birdle Javascript URL:", js_url)
+
+    # Grab wordle javascript
+    wordle_js = requests.get(js_url).text
+
+    # Go to crib
+    solutions_start = wordle_js.index(FLAPPY_BIRDLE_SOLUTIONS_CRIB)
+    solutions_stop = wordle_js.index("]", solutions_start) + 1
+
+    solutions_raw = wordle_js[solutions_start:solutions_stop]
+    solutions = json.loads(solutions_raw)
+
+    # Birdle word list is all possible words
+    word_list = []
+
+    for word in itertools.product(*[letters] * 5):
+        word_list.append("".join(word))
+
+    return solutions, word_list
