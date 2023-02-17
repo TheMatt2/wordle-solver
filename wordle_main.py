@@ -29,8 +29,8 @@ def choose_context():
 
         return contexts[choice - 1]
 
-def print_best_guesses(guesses, count = 10):
-    for guess in sorted(guesses):
+def print_first(guesses, count = 10):
+    for guess in guesses:
         print(guess)
         count -= 1
         if not count: break
@@ -73,8 +73,8 @@ def main():
         guesses, _ = wordle_solver.best_guesses(word_list, word_stats)
         wordle_contexts.save_guesses(context, naive, guesses)
 
-    print_best_guesses(guesses)
     guesses.sort()
+    print_first(guesses)
     word = guesses[0]
     print(f"Best starting word: {word}")
     rank, foil = wordle_solver.word_rank(word, word_stats)
@@ -110,12 +110,7 @@ def main():
         word_stats.filter(word, result)
 
         print("Words Remaining:", len(word_stats))
-
-        for i, word in enumerate(word_stats):
-            print(word)
-            if i == 10:
-                break
-        print()
+        print_first(word_stats)
 
         if len(word_stats) == 2:
             # Only two or less words
@@ -138,8 +133,8 @@ def main():
             break
 
         guesses, rank = wordle_solver.best_guesses(word_list, word_stats)
-        print_best_guesses(guesses)
         guesses.sort()
+        print_first(guesses)
         word = guesses[0]
         print("Best Next Guess:", word)
 

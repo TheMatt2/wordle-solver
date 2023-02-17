@@ -185,14 +185,14 @@ def word_rank(word, word_stats):
     # Foil is the result that keeps the most combinations
     return rank, foil
 
-def best_guesses(word_list, word_stats):
+def best_guesses(word_list, word_stats, progress = True):
     # Find the best next word
     best_guesses = []
     best_rank = None
 
     start = time.time()
     for i, word in enumerate(word_list):
-        if i % 100 == 0:
+        if progress and i % 100 == 0:
             print(f"Progress: {i * 100 / len(word_list):.2f}% ({i} / {len(word_list)})", end = "\r")
 
         rank, foil = word_rank(word, word_stats)
@@ -204,7 +204,8 @@ def best_guesses(word_list, word_stats):
         elif rank == best_rank:
             best_guesses.append(word)
 
-    print(f"Progress: 100.00% ({len(word_list)} / {len(word_list)})")
+    if progress:
+        print(f"Progress: 100.00% ({len(word_list)} / {len(word_list)})")
 
     # If a guess is in the solution set, that actually makes it
     # better than any other option
@@ -220,5 +221,7 @@ def best_guesses(word_list, word_stats):
             guess for guess in best_guesses if guess in word_stats]
     stop = time.time()
 
-    print(f"Calculated Guesses in {stop - start:.3f} seconds")
+    if progress:
+        print(f"Calculated Guesses in {stop - start:.3f} seconds")
+
     return best_guesses, best_rank
