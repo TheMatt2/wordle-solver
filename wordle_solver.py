@@ -180,7 +180,8 @@ def word_rank(word, word_stats):
         word_stats.reset()
 
     assert rank
-    assert total == len(word_stats), f"{total = } and {len(word_stats) = } differ for {word = }"
+    assert total == len(word_stats), \
+        f"total = {total} and remaining words {len(word_stats)} differ for word {word}"
 
     # Foil is the result that keeps the most combinations
     return rank, foil
