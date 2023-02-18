@@ -137,16 +137,16 @@ def test_wordle(context, naive, solution = None):
 
 def main():
     init()
-    test_wordle("new_york_times", False)
-    test_wordle("wordlegame_org", False)
-    test_wordle("new_york_times", True)
-    test_wordle("wordlegame_org", True)
 
-    for solution in ["magic", "abort", "krill"]:
+    start = time.perf_counter()
+    for solution in [None, "magic", "abort", "krill", "staff"]:
         test_wordle("new_york_times", False, solution)
         test_wordle("wordlegame_org", False, solution)
         test_wordle("new_york_times", True, solution)
         test_wordle("wordlegame_org", True, solution)
+
+    stop = time.perf_counter()
+    print(f"Tests duration {stop - start:.4f}")
 
 if __name__ == "__main__":
     main()
