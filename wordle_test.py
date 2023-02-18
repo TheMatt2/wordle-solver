@@ -1,9 +1,26 @@
-from colorama import init, Back
-
 import time
 
 import wordle_solver
 import wordle_contexts
+
+# Use coloring if avaliable
+try:
+    from colorama import init, Back
+except ImportError:
+    # Don't color as colorama is not installed
+    def wordle_coloring(guess, result):
+        return f"{guess} ({result})"
+else:
+    def wordle_coloring(guess, result):
+        """Adding black, yellow, green coloring for wordle coloring"""
+        coloring = []
+        for g, r in zip(guess, result):
+            if   r == "g": color = Back.GREEN
+            elif r == "y": color = Back.YELLOW
+            elif r == "b": color = Back.BLACK
+            coloring.append(color + g)
+
+        return "".join(coloring) + Back.RESET + f" ({result})"
 
 word_length = 5
 letters = "abcdefghijklmnopqrstuvwxyz"
@@ -50,17 +67,6 @@ def wordle_result(guess, solution):
                 result[index] = "b"
 
     return "".join(result)
-
-def wordle_coloring(guess, result):
-    """Adding black, yellow, green coloring for wordle coloring"""
-    coloring = []
-    for g, r in zip(guess, result):
-        if   r == "g": color = Back.GREEN
-        elif r == "y": color = Back.YELLOW
-        elif r == "b": color = Back.BLACK
-        coloring.append(color + g)
-
-    return "".join(coloring) + Back.RESET + f" ({result})"
 
 def test_wordle(context, naive, solution = None):
     """Play wordle, and time how long it takes.
