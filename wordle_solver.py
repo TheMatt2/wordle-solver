@@ -5,10 +5,18 @@ word_length = 5
 letters = "abcdefghijklmnopqrstuvwxyz"
 
 class WordStats:
+    """
+    Track the list of possible solutions, and keep statistics on the words.
+    Word Stats also keeps an "Undo" state, so that the word list can be rolled back
+    to the previous state if a guess is wrong using reset().
+    """
     def __init__(self, word_list):
+        # Setup rollback state
         self.prev_word_list = set(word_list)
         self.word_list = self.prev_word_list.copy()
         self.changed = False
+
+        # Calculate stats for words
         self.calculate_stats()
 
     def __len__(self):
@@ -27,6 +35,7 @@ class WordStats:
         return f"<WordStats with {len(self)} words>"
 
     def calculate_stats(self):
+        """Calculate statistics for the current word list"""
         # Word breakdown
         self.word_breakdown = [
             {v: set() for v in letters}
@@ -40,13 +49,13 @@ class WordStats:
         self.word_contains = {v: set() for v in letters}
         for letter in letters:
             for index in range(word_length):
-                self.word_contains[letter].update(
-                    self.word_breakdown[index][letter])
+                self.word_contains[letter].update(self.word_breakdown[index][letter])
 
         # Letter count
         # Create a bucket for each letter and count of that letter in word
         # Note that some buckets will always be empty
-        self.letter_count = {v: {k: set() for k in range(1, word_length)} for v in letters}
+        self.letter_count = {v: {k: set() for k in range(1, word_length + 1)} for v in letters}
+
         for word in self.word_list:
             for letter in set(word):
                 letter_count = word.count(letter)
