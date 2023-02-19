@@ -8,6 +8,7 @@ try:
     from colorama import init, Back
 except ImportError:
     # Don't color as colorama is not installed
+    init = lambda: None
     def wordle_coloring(guess, result):
         return f"{guess} ({result})"
 else:
