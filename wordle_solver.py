@@ -131,28 +131,38 @@ class GuessGroup(WordGroup):
 
         # Filter out guesses that are not possible
         # based on the result
-        # Create a set of all words that contain excluded letters
-        suspect_words = set()
+        # Create a set of all words that contain excluded letters, grouped by count
+        suspect_breakdown = {index: set() for index in range(1, word_length + 1)}
         for letter in excluded_letters:
-            suspect_words.update(self._word_contains[letter])
+            for word in self._word_contains[letter]:
+                suspect_breakdown[len(excluded_letters.intersection(word))].add(word)
 
-        for word in suspect_words:
-            # Check if a word exists that contains all of the non-excluded letters
-            superior_words = None
-            for index in range(word_length):
-                if word[index] not in excluded_letters:
-                    if superior_words is None:
-                        superior_words = self._word_breakdown[index][word[index]]
-                    else:
-                        superior_words.intersection_update(
-                            self._word_breakdown[index][word[index]])
+        # Starting with the words with the most excluded letters
+        # Since a word with only excluded letters will return result bbbbb
+        # There is no information to be gained from it
+        self._word_list.difference_update(suspect_breakdown[word_length])
 
-            if superior_words is None:
-                # Remove word if all letters are excluded
-                self._word_list.remove(word)
-            else:
+        for count in range(word_length - 1, 0, -1):
+            for word in suspect_breakdown[count]:
+                # Check if a word exists that contains all of the non-excluded letters
+                superior_words = None
+                for index in range(word_length):
+                    if word[index] not in excluded_letters:
+                        word_set = self._word_breakdown[index][word[index]]
+                        if superior_words is None:
+                            superior_words = word_set
+                        else:
+                            superior_words.intersection_update(word_set)
+
+                if superior_words is None:
+                    # Remove word if all letters are excluded
+                    self._word_list.remove(word)
+                    continue
+
                 # Remove superior words if they contain excluded letters
-                superior_words.difference_update(suspect_words)
+                for other_count in range(count, word_length + 1):
+                    superior_words.difference_update(suspect_breakdown[other_count])
+
                 if superior_words:
                     # Remove word from list
                     self._word_list.remove(word)
