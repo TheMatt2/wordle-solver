@@ -217,6 +217,21 @@ def word_rank(word, word_stats):
     # Foil is the result that keeps the most combinations
     return rank, foil
 
+def gen_possible_words(word, excluded_letters):
+    for index in range(len(word)):
+        if word[index] in excluded_letters:
+            prefix = word[:index]
+            suffix = word[index + 1:]
+
+            for letter in letters:
+                # Don't generate the same word
+                if letter != word[index]:
+                    yield prefix + letter + suffix
+
+                if suffix and letter not in excluded_letters:
+                    for postfix in gen_possible_words(suffix, excluded_letters):
+                        yield prefix + letter + postfix
+
 def best_guesses(word_list, word_stats, progress = True):
     # Find the best next word
     best_guesses = []
@@ -224,23 +239,26 @@ def best_guesses(word_list, word_stats, progress = True):
 
     # Do not consider words that use letters that are already excluded
     start = time.time()
-    import re
     excluded_letters = word_stats.excluded_letters
-    original_word_list = len(word_list)
-    word_list = list(word_list)
-    for word in list(word_list):
-        pat = word
-        for letter in excluded_letters:
-            pat = pat.replace(letter, ".")
+    full_word_list_count = len(word_list)
+    word_list = set(word_list)
 
-        other_words = [w for w in word_list if w != word and re.match(pat, w)]
-        if other_words:
-            word_list.remove(word)
+    for word in list(word_list):
+        if excluded_letters.isdisjoint(word):
+            continue
+
+        for maybe_word in gen_possible_words(word, excluded_letters):
+            if maybe_word in word_list:
+                word_list.remove(word)
+                break
+
     stop = time.time()
-    print(f"Excluded {original_word_list} words down to {len(word_list)} in {stop - start:.4f} seconds")
+
+    if progress:
+        print(f"Excluded {full_word_list_count} words down to "
+            f"{len(word_list)} in {stop - start:.4f} seconds")
 
     start = time.time()
-
     for i, word in enumerate(word_list):
         if progress and i % 100 == 0:
             print(f"Progress: {i * 100 / len(word_list):.2f}% ({i} / {len(word_list)})", end = "\r")
