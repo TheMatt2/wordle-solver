@@ -228,9 +228,10 @@ def gen_possible_words(word, excluded_letters):
                 if letter != word[index]:
                     yield prefix + letter + suffix
 
-                if suffix and letter not in excluded_letters:
+            if suffix:
+                for letter in excluded_letters.symmetric_difference(letters):
                     for postfix in gen_possible_words(suffix, excluded_letters):
-                        yield prefix + letter + postfix
+                        yield f"{prefix}{letter}{postfix}"
 
 def best_guesses(word_list, word_stats, progress = True):
     # Find the best next word
