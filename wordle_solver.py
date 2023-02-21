@@ -148,7 +148,8 @@ class GuessGroup(WordGroup):
                 superior_words = None
                 for index in range(word_length):
                     if word[index] not in excluded_letters:
-                        word_set = self._word_breakdown[index][word[index]]
+                        word_set = self._word_breakdown[index][word[index]].copy()
+
                         if superior_words is None:
                             superior_words = word_set
                         else:
