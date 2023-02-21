@@ -4,16 +4,16 @@ import itertools
 word_length = 5
 letters = "abcdefghijklmnopqrstuvwxyz"
 
-class WordStats:
+class WordGroup:
     """
-    Track the list of possible solutions, and keep statistics on the words.
-    Word Stats also keeps an "Undo" state, so that the word list can be rolled back
+    Keep statistics on the words for refining solutions and guesses.
+    Keeps an "undo" state, so that the word list can be rolled back
     to the previous state if a guess is wrong using reset().
     """
     def __init__(self, word_list):
         # Setup rollback state
         self._prev_word_list = set(word_list)
-        self.word_list = self._prev_word_list.copy()
+        self._word_list = self._prev_word_list.copy()
         self.changed = False
 
         # Internal statistics
@@ -29,16 +29,16 @@ class WordStats:
         self.calculate_stats()
 
     def __len__(self):
-        return len(self.word_list)
+        return len(self._word_list)
 
     def __contains__(self, val):
-        return val in self.word_list
+        return val in self._word_list
 
     def __bool__(self):
-        return bool(self.word_list)
+        return bool(self._word_list)
 
     def __iter__(self):
-        return iter(self.word_list)
+        return iter(self._word_list)
 
     def __repr__(self):
         return f"<WordStats with {len(self)} words>"
@@ -50,7 +50,7 @@ class WordStats:
             {v: set() for v in letters}
              for i in range(word_length)]
 
-        for word in self.word_list:
+        for word in self._word_list:
             for index in range(word_length):
                 self._word_breakdown[index][word[index]].add(word)
 
@@ -65,14 +65,124 @@ class WordStats:
         # Note that some buckets will always be empty
         self._letter_count = {v: {k: set() for k in range(1, word_length + 1)} for v in letters}
 
-        for word in self.word_list:
+        for word in self._word_list:
             for letter in set(word):
                 letter_count = word.count(letter)
                 self._letter_count[letter][letter_count].add(word)
 
-    def filter(self, word, result):
+    @property
+    def excluded_letters(self):
+        """Check which letters that can not be part of the solution"""
+        # Very inefficient method, hack for now
+        included_letters = set()
+        for word in self:
+            included_letters.update(word)
+            if len(included_letters) == len(letters):
+                # All letters are present
+                assert included_letters == set(letters)
+                break
+
+        return included_letters.symmetric_difference(letters)
+
+    def reset(self):
         if self.changed:
-            self._prev_word_list = self.word_list.copy()
+            self._word_list = self._prev_word_list.copy()
+            self.changed = False
+
+# def gen_possible_words(word, excluded_letters):
+#     for index in range(len(word)):
+#         if word[index] in excluded_letters:
+#             prefix = word[:index]
+#             suffix = word[index + 1:]
+
+#             for letter in letters:
+#                 # Don't generate the same word
+#                 if letter != word[index]:
+#                     yield f"{prefix}{letter}{suffix}"
+
+#             if suffix:
+#                 for letter in excluded_letters.symmetric_difference(letters):
+#                     for postfix in gen_possible_words(suffix, excluded_letters):
+#                         yield f"{prefix}{letter}{postfix}"
+
+class GuessGroup(WordGroup):
+    """
+    Use results learned from playing the game to refine possible guesses.
+    """
+    # def filter_guesses(self, excluded_letters):
+    #     # Filter out guesses that are not possible
+    #     # based on the result
+    #     # This is a very inefficient method, but it works
+    #     for word in sorted(self._word_list):
+    #         if excluded_letters.isdisjoint(word):
+    #             continue
+
+    #         for maybe_word in gen_possible_words(word, excluded_letters):
+    #             if maybe_word in self._word_list:
+    #                 self._word_list.remove(word)
+    #                 break
+
+    def filter_guesses(self, excluded_letters):
+        if self.changed:
+            self._prev_word_list = self._word_list.copy()
+            self.calculate_stats()
+        else:
+            self.changed = True
+
+        # Filter out guesses that are not possible
+        # based on the result
+        # Create a set of all words that contain excluded letters
+        suspect_words = set()
+        for letter in excluded_letters:
+            suspect_words.update(self._word_contains[letter])
+
+        for word in suspect_words:
+            # Check if a word exists that contains all of the non-excluded letters
+            superior_words = None
+            for index in range(word_length):
+                if word[index] not in excluded_letters:
+                    if superior_words is None:
+                        superior_words = self._word_breakdown[index][word[index]]
+                    else:
+                        superior_words.intersection_update(
+                            self._word_breakdown[index][word[index]])
+
+            if superior_words is None:
+                # Remove word if all letters are excluded
+                self._word_list.remove(word)
+            else:
+                # Remove superior words if they contain excluded letters
+                superior_words.difference_update(suspect_words)
+                if superior_words:
+                    # Remove word from list
+                    self._word_list.remove(word)
+
+RESULTS = ["".join(result) for result in itertools.product(*["gyb"] * word_length)]
+
+# You can't have 4 known letters, and 1 incorrectly positioned
+RESULTS = [result for result in RESULTS if result.count("y") != 1 or "b" in result]
+RESULTS.reverse()
+
+def result_possible(word, result):
+    # If a letter is duplicated, then the first instance must be found
+    absent = set()
+
+    for index in range(word_length):
+        if result[index] == "b":
+            absent.add(word[index])
+        elif result[index] == "y":
+            # Letter Present, not possible for it to have been previously absent
+            if word[index] in absent:
+                return False
+    return True
+
+class SolutionGroup(GuessGroup):
+    """
+    Use results learned from playing the game to refine possible solutions.
+    """
+    def filter_solutions(self, word, result):
+        if self.changed:
+            self._prev_word_list = self._word_list.copy()
             self.calculate_stats()
         else:
             self.changed = True
@@ -80,21 +190,21 @@ class WordStats:
         for index in range(word_length):
             if result[index] == "g":
                 # Keep only words that have that letter in that position
-                self.word_list.intersection_update(self._word_breakdown[index][word[index]])
+                self._word_list.intersection_update(self._word_breakdown[index][word[index]])
             else:
                 # Keep only words that don't have that letter in that position
-                self.word_list.difference_update(self._word_breakdown[index][word[index]])
+                self._word_list.difference_update(self._word_breakdown[index][word[index]])
 
                 if result[index] == "y":
                     # Keep only words that have that letter somewhere
-                    self.word_list.intersection_update(self._word_contains[word[index]])
+                    self._word_list.intersection_update(self._word_contains[word[index]])
                 else:
                     assert result[index] == "b"
 
                     # If letter does not appear anywhere else in the word,
                     # then keep only works without the letter
                     if not (word[index] in word[:index] or word[index] in word[index + 1:]):
-                        self.word_list.difference_update(self._word_contains[word[index]])
+                        self._word_list.difference_update(self._word_contains[word[index]])
 
         # Filter further for repeated letters
         for letter in set(word):
@@ -121,150 +231,107 @@ class WordStats:
                 if absent_count and (present_count or correct_count):
                     # The word occurs more times in this word than the solution
                     # Restrict count
-                    self.word_list.intersection_update(
+                    self._word_list.intersection_update(
                         self._letter_count[letter][present_count + correct_count])
                 elif absent_count and not present_count and not correct_count:
                     # Letter does not occur in word
-                    self.word_list.difference_update(self._word_contains[letter])
+                    self._word_list.difference_update(self._word_contains[letter])
                 else:
                     assert not absent_count
                     # No strict limit on the number of letters, but we can set a lower limit
                     for count in range(1, present_count + correct_count):
-                        self.word_list.difference_update(self._letter_count[letter][count])
+                        self._word_list.difference_update(self._letter_count[letter][count])
 
-    @property
-    def excluded_letters(self):
-        """Check which letters that can not be part of the solution"""
-        # Very inefficient method, hack for now
-        included_letters = set()
-        for word in self:
-            included_letters.update(word)
+    def guess_rank(self, guess):
+        """
+        Calculate rank of a word in this group. Higher rank means better guess.
+        Uses interal reset state."""
+        # If word has repeated letters, right gives the same amount of information,
+        # positions gives a bit less, wrong gives a fair bit less information
+        # Rank = Sum [Pr[permutation] * information]
+        # G is correct
+        # Y is present
+        # B is absent
+        rank = 0
+        if __debug__:
+            # Total is tracked as a sanity check
+            total = 0
 
-        return included_letters.symmetric_difference(letters)
+        # Words that are already returned from filter_solutions()
+        # will not be returned by other result.
+        # So keep a list of processed words, and don't consider them
+        # for further filtering.
+        processed_words = set()
+        for result in RESULTS:
+            self._word_list.difference_update(processed_words)
+            if not self:
+                # Force this to marked as changed
+                self.changed = True
+                self.reset()
+                break
 
-    def reset(self):
-        if self.changed:
-            self.word_list = self._prev_word_list.copy()
-            self.changed = False
+            # Check if this result can occur
+            if not result_possible(guess, result):
+                continue
 
-results = ["".join(result) for result in itertools.product(*["gyb"] * word_length)]
+            # Calculate number of words that remain if this result occurs
+            self.filter_solutions(guess, result)
 
-# You can't have 4 known letters, and 1 incorrectly positioned
-results = [result for result in results if result.count("y") != 1 or "b" in result]
-results.reverse()
+            # Calculate the percent of words that fall in this group
+            part = len(self)
+            if __debug__:
+                total += part # Sanity check
 
-def result_possible(word, result):
-    # If a letter is duplicated, then the first instance must be found
-    absent = set()
+            assert processed_words.isdisjoint(self._word_list), \
+                f"Results have overlapping words: {processed_words.intersection(self._word_list)}"
+            processed_words.update(self._word_list)
 
-    for index in range(word_length):
-        if result[index] == "b":
-            absent.add(word[index])
-        elif result[index] == "y":
-            # Letter Present, not possible for it to have been previously absent
-            if word[index] in absent:
-                return False
-    return True
+            # Rank is the highest count of words that can result
+            if part > rank:
+                rank = part
+                foil = result
 
-def word_rank(word, word_stats):
-    # If word has repeated letters, right gives the same amount of information, positions gives a bit less
-    # wrong gives a fair bit less information
-    # Rank = Sum [Pr[permutation] * information]
-    # G is correct
-    # Y is present
-    # B is absent
-    assert word_stats
+            assert len(processed_words) == total
+            self.reset()
 
-    rank = 0
-    total = 0
+        assert rank
+        assert total == len(self), \
+            f"total = {total} and remaining words {len(self)} differ for guess {guess}"
 
-    words = set()
-    for result in results:
-        # assert word_stats
-        word_stats.word_list.difference_update(words)
-        if not word_stats:
-            word_stats.changed = True
-            word_stats.reset()
-            break
+        # Foil is the result that keeps the most combinations
+        return rank, foil
 
-        # Check if this result can occur
-        if not result_possible(word, result):
-            continue
+    # def filter_guesses(self, excluded_letters):
+    #     """
+    #     Dummy function, in case we are playing hard mode,
+    #     where all guesses must be possible solutions.
+    #     """
+    #     # Filtering is already done by filter_solutions()
+    #     # No need to filter further
+    #     self.changed = True
 
-        # Calculate number of words that remain if this result occurs
-        word_stats.filter(word, result)
 
-        # Calculate the percent of words that fall in this group
-        part = len(word_stats)
-        total += part # Sanity check
-
-        assert words.isdisjoint(word_stats.word_list), \
-            f"Results have overlapping words: {words.intersection(word_stats.word_list)}"
-        words.update(word_stats.word_list)
-
-        # Rank is the highest count of words that can result
-        if part > rank:
-            rank = part
-            foil = result
-
-        assert(len(words) == total)
-        word_stats.reset()
-
-    assert rank
-    assert total == len(word_stats), \
-        f"total = {total} and remaining words {len(word_stats)} differ for word {word}"
-
-    # Foil is the result that keeps the most combinations
-    return rank, foil
-
-def gen_possible_words(word, excluded_letters):
-    for index in range(len(word)):
-        if word[index] in excluded_letters:
-            prefix = word[:index]
-            suffix = word[index + 1:]
-
-            for letter in letters:
-                # Don't generate the same word
-                if letter != word[index]:
-                    yield prefix + letter + suffix
-
-            if suffix:
-                for letter in excluded_letters.symmetric_difference(letters):
-                    for postfix in gen_possible_words(suffix, excluded_letters):
-                        yield f"{prefix}{letter}{postfix}"
-
-def best_guesses(word_list, word_stats, progress = True):
+def best_guesses(guess_group, solution_group, progress = True):
     # Find the best next word
     best_guesses = []
     best_rank = None
 
     # Do not consider words that use letters that are already excluded
     start = time.time()
-    excluded_letters = word_stats.excluded_letters
-    full_word_list_count = len(word_list)
-    word_list = set(word_list)
-
-    for word in list(word_list):
-        if excluded_letters.isdisjoint(word):
-            continue
-
-        for maybe_word in gen_possible_words(word, excluded_letters):
-            if maybe_word in word_list:
-                word_list.remove(word)
-                break
-
+    full_word_list_count = len(guess_group)
+    guess_group.filter_guesses(solution_group.excluded_letters)
     stop = time.time()
 
     if progress:
         print(f"Excluded {full_word_list_count} words down to "
-            f"{len(word_list)} in {stop - start:.4f} seconds")
+            f"{len(guess_group)} in {stop - start:.4f} seconds")
 
     start = time.time()
-    for i, word in enumerate(word_list):
+    for i, word in enumerate(guess_group):
         if progress and i % 100 == 0:
-            print(f"Progress: {i * 100 / len(word_list):.2f}% ({i} / {len(word_list)})", end = "\r")
+            print(f"Progress: {i * 100 / len(guess_group):.2f}% ({i} / {len(guess_group)})", end = "\r")
 
-        rank, foil = word_rank(word, word_stats)
+        rank, foil = solution_group.guess_rank(word)
 
         if not best_rank or rank < best_rank:
             best_rank = rank
@@ -274,20 +341,20 @@ def best_guesses(word_list, word_stats, progress = True):
             best_guesses.append(word)
 
     if progress:
-        print(f"Progress: 100.00% ({len(word_list)} / {len(word_list)})")
+        print(f"Progress: 100.00% ({len(guess_group)} / {len(guess_group)})")
 
     # If a guess is in the solution set, that actually makes it
     # better than any other option
     guess_in_solutions = False
     for guess in best_guesses:
-        if guess in word_stats:
+        if guess in solution_group:
             guess_in_solutions = True
             break
 
     if guess_in_solutions:
         # Filter down to only guesses in solutions
         best_guesses = [
-            guess for guess in best_guesses if guess in word_stats]
+            guess for guess in best_guesses if guess in solution_group]
     stop = time.time()
 
     if progress:

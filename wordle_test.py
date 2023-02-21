@@ -78,7 +78,8 @@ def test_wordle(context, naive, solution = None):
     if naive:
         solutions = word_list
 
-    word_stats = wordle_solver.WordStats(solutions)
+    solution_group = wordle_solver.SolutionGroup(solutions)
+    guess_group = wordle_solver.GuessGroup(word_list)
 
     # "guesses" is the initial guess for this Wordle game
     # without knowing any information specific to this game
@@ -87,7 +88,7 @@ def test_wordle(context, naive, solution = None):
     if not guesses:
         # Generate initial guesses
         print("Generating Initial Guesses. Not included in testing time, but will take a while.")
-        guesses, rank = wordle_solver.best_guesses(word_list, word_stats)
+        guesses, rank = wordle_solver.best_guesses(guess_group, solution_group)
         wordle_contexts.save_guesses(context, naive, guesses)
 
     guesses.sort()
@@ -100,7 +101,7 @@ def test_wordle(context, naive, solution = None):
         if solution:
             result = wordle_result(word, solution)
         else:
-            rank, foil = wordle_solver.word_rank(word, word_stats)
+            rank, foil = solution_group.guess_rank(word)
             result = foil
 
         print(wordle_coloring(word, result))
@@ -113,26 +114,26 @@ def test_wordle(context, naive, solution = None):
             break
 
         # Find number of words remaining
-        word_stats.filter(word, result)
+        solution_group.filter_solutions(word, result)
 
-        if len(word_stats) == 2:
+        if len(solution_group) == 2:
             # Only two or less words
             # Best solution is to guess one of the words
-            words = sorted(word_stats)
+            words = sorted(solution_group)
             word = words[0]
             continue
 
-        if len(word_stats) == 1:
+        if len(solution_group) == 1:
             # Only one solution
-            word = next(iter(word_stats))
+            word = next(iter(solution_group))
             continue
 
-        if len(word_stats) == 0:
+        if len(solution_group) == 0:
             # No remaining solutions
             print("There are no possible remaining solutions.")
             break
 
-        guesses, rank = wordle_solver.best_guesses(word_list, word_stats, progress = False)
+        guesses, rank = wordle_solver.best_guesses(guess_group, solution_group, progress = False)
         guesses.sort()
         word = guesses[0]
 

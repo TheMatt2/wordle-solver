@@ -56,30 +56,36 @@ def main():
     print(f"Loaded {len(solutions)} possible solutions.")
 
     naive = input(
-        "Should the computer play naively (assume any word can be a solution)?: "
+        "Should the computer assume any word can be a solution?: "
         ).strip() == "y"
 
     if naive:
         solutions = word_list
 
-    word_stats = wordle_solver.WordStats(solutions)
+    solution_group = wordle_solver.SolutionGroup(solutions)
+    hard_mode = input("Hard Mode?: ").strip() == "y"
+
+    if hard_mode:
+        guess_group = solution_group
+    else:
+        guess_group = wordle_solver.GuessGroup(word_list)
 
     # "guesses" is the initial guess for this Wordle game
     # without knowing any information specific to this game
-    guesses = wordle_contexts.load_guesses(context, naive)
+    init_guesses = wordle_contexts.load_guesses(context, naive)
 
-    if not guesses:
+    if not init_guesses:
         # Generate initial guesses
-        guesses, _ = wordle_solver.best_guesses(word_list, word_stats)
-        wordle_contexts.save_guesses(context, naive, guesses)
+        init_guesses, _ = wordle_solver.best_guesses(guess_group, solution_group)
+        wordle_contexts.save_guesses(context, naive, init_guesses)
 
-    guesses.sort()
-    print_first(guesses)
-    word = guesses[0]
+    init_guesses.sort()
+    print_first(init_guesses)
+    word = init_guesses[0]
     print(f"Best starting word: {word}")
-    rank, foil = wordle_solver.word_rank(word, word_stats)
+    rank, foil = solution_group.guess_rank(word)
     print(f"rank: {rank} worst case: {foil}")
-    print("Words Remaining:", len(word_stats))
+    print("Words Remaining:", len(solution_group))
 
     while True:
         while True:
@@ -107,35 +113,35 @@ def main():
             break
 
         # Find number of words remaining
-        word_stats.filter(word, result)
+        solution_group.filter_solutions(word, result)
 
-        print("Words Remaining:", len(word_stats))
-        print_first(word_stats)
+        print("Words Remaining:", len(solution_group))
+        print_first(solution_group)
 
-        if len(word_stats) == 2:
+        if len(solution_group) == 2:
             # Only two or less words
             # Best solution is to guess one of the words
-            words = sorted(word_stats)
+            words = sorted(solution_group)
             word = words[0]
             print("Best Next Guess:", words[0])
             print("Failing Guess:", words[1])
             continue
 
-        if len(word_stats) == 1:
+        if len(solution_group) == 1:
             # Only one solution
-            word = next(iter(word_stats))
+            word = next(iter(solution_group))
             print("Best Next Guess:", word)
             break
 
-        if len(word_stats) == 0:
+        if len(solution_group) == 0:
             # No remaining solutions
             print("There are no possible remaining solutions.")
             break
 
-        guesses, rank = wordle_solver.best_guesses(word_list, word_stats)
-        guesses.sort()
-        print_first(guesses)
-        word = guesses[0]
+        init_guesses, rank = wordle_solver.best_guesses(guess_group, solution_group)
+        init_guesses.sort()
+        print_first(init_guesses)
+        word = init_guesses[0]
         print("Best Next Guess:", word)
 
 if __name__ == "__main__":
