@@ -12,9 +12,18 @@ class WordStats:
     """
     def __init__(self, word_list):
         # Setup rollback state
-        self.prev_word_list = set(word_list)
-        self.word_list = self.prev_word_list.copy()
+        self._prev_word_list = set(word_list)
+        self.word_list = self._prev_word_list.copy()
         self.changed = False
+
+        # Internal statistics
+        # Must be internal, because they are only calculated as needed
+        # and backup state is lost
+
+        # actually initialized in calculate_stats()
+        self._word_breakdown = None
+        self._word_contains = None
+        self._letter_count = None
 
         # Calculate stats for words
         self.calculate_stats()
@@ -37,33 +46,33 @@ class WordStats:
     def calculate_stats(self):
         """Calculate statistics for the current word list"""
         # Word breakdown
-        self.word_breakdown = [
+        self._word_breakdown = [
             {v: set() for v in letters}
              for i in range(word_length)]
 
         for word in self.word_list:
             for index in range(word_length):
-                self.word_breakdown[index][word[index]].add(word)
+                self._word_breakdown[index][word[index]].add(word)
 
         # Word contains
-        self.word_contains = {v: set() for v in letters}
+        self._word_contains = {v: set() for v in letters}
         for letter in letters:
             for index in range(word_length):
-                self.word_contains[letter].update(self.word_breakdown[index][letter])
+                self._word_contains[letter].update(self._word_breakdown[index][letter])
 
         # Letter count
         # Create a bucket for each letter and count of that letter in word
         # Note that some buckets will always be empty
-        self.letter_count = {v: {k: set() for k in range(1, word_length + 1)} for v in letters}
+        self._letter_count = {v: {k: set() for k in range(1, word_length + 1)} for v in letters}
 
         for word in self.word_list:
             for letter in set(word):
                 letter_count = word.count(letter)
-                self.letter_count[letter][letter_count].add(word)
+                self._letter_count[letter][letter_count].add(word)
 
     def filter(self, word, result):
         if self.changed:
-            self.prev_word_list = self.word_list.copy()
+            self._prev_word_list = self.word_list.copy()
             self.calculate_stats()
         else:
             self.changed = True
@@ -71,19 +80,21 @@ class WordStats:
         for index in range(word_length):
             if result[index] == "g":
                 # Keep only words that have that letter in that position
-                self.word_list.intersection_update(self.word_breakdown[index][word[index]])
+                self.word_list.intersection_update(self._word_breakdown[index][word[index]])
             else:
                 # Keep only words that don't have that letter in that position
-                self.word_list.difference_update(self.word_breakdown[index][word[index]])
+                self.word_list.difference_update(self._word_breakdown[index][word[index]])
 
                 if result[index] == "y":
                     # Keep only words that have that letter somewhere
-                    self.word_list.intersection_update(self.word_contains[word[index]])
+                    self.word_list.intersection_update(self._word_contains[word[index]])
                 else:
                     assert result[index] == "b"
 
+                    # If letter does not appear anywhere else in the word,
+                    # then keep only works without the letter
                     if not (word[index] in word[:index] or word[index] in word[index + 1:]):
-                        self.word_list.difference_update(self.word_contains[word[index]])
+                        self.word_list.difference_update(self._word_contains[word[index]])
 
         # Filter further for repeated letters
         for letter in set(word):
@@ -110,19 +121,30 @@ class WordStats:
                 if absent_count and (present_count or correct_count):
                     # The word occurs more times in this word than the solution
                     # Restrict count
-                    self.word_list.intersection_update(self.letter_count[letter][present_count + correct_count])
+                    self.word_list.intersection_update(
+                        self._letter_count[letter][present_count + correct_count])
                 elif absent_count and not present_count and not correct_count:
                     # Letter does not occur in word
-                    self.word_list.difference_update(self.word_contains[letter])
+                    self.word_list.difference_update(self._word_contains[letter])
                 else:
                     assert not absent_count
                     # No strict limit on the number of letters, but we can set a lower limit
                     for count in range(1, present_count + correct_count):
-                        self.word_list.difference_update(self.letter_count[letter][count])
+                        self.word_list.difference_update(self._letter_count[letter][count])
+
+    @property
+    def excluded_letters(self):
+        """Check which letters that can not be part of the solution"""
+        # Very inefficient method, hack for now
+        included_letters = set()
+        for word in self:
+            included_letters.update(word)
+
+        return included_letters.symmetric_difference(letters)
 
     def reset(self):
         if self.changed:
-            self.word_list = self.prev_word_list.copy()
+            self.word_list = self._prev_word_list.copy()
             self.changed = False
 
 results = ["".join(result) for result in itertools.product(*["gyb"] * word_length)]
@@ -200,7 +222,25 @@ def best_guesses(word_list, word_stats, progress = True):
     best_guesses = []
     best_rank = None
 
+    # Do not consider words that use letters that are already excluded
     start = time.time()
+    import re
+    excluded_letters = word_stats.excluded_letters
+    original_word_list = len(word_list)
+    word_list = list(word_list)
+    for word in list(word_list):
+        pat = word
+        for letter in excluded_letters:
+            pat = pat.replace(letter, ".")
+
+        other_words = [w for w in word_list if w != word and re.match(pat, w)]
+        if other_words:
+            word_list.remove(word)
+    stop = time.time()
+    print(f"Excluded {original_word_list} words down to {len(word_list)} in {stop - start:.4f} seconds")
+
+    start = time.time()
+
     for i, word in enumerate(word_list):
         if progress and i % 100 == 0:
             print(f"Progress: {i * 100 / len(word_list):.2f}% ({i} / {len(word_list)})", end = "\r")
