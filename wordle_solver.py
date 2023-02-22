@@ -47,28 +47,42 @@ class WordGroup:
         """Calculate statistics for the current word list"""
         # Word breakdown
         self._word_breakdown = [
-            {v: set() for v in letters}
+            {l: set() for l in letters}
              for i in range(word_length)]
 
         for word in self._word_list:
             for index in range(word_length):
                 self._word_breakdown[index][word[index]].add(word)
 
+        # Make Word breakdown frozensets
+        for index in range(word_length):
+            for letter in letters:
+                self._word_breakdown[index][letter] = frozenset(self._word_breakdown[index][letter])
+
         # Word contains
-        self._word_contains = {v: set() for v in letters}
+        self._word_contains = {l: set() for l in letters}
         for letter in letters:
             for index in range(word_length):
                 self._word_contains[letter].update(self._word_breakdown[index][letter])
 
+        # Make Word contains frozensets
+        for letter in letters:
+            self._word_contains[letter] = frozenset(self._word_contains[letter])
+
         # Letter count
         # Create a bucket for each letter and count of that letter in word
         # Note that some buckets will always be empty
-        self._letter_count = {v: {k: set() for k in range(1, word_length + 1)} for v in letters}
+        self._letter_count = {l: {c: set() for c in range(1, word_length + 1)} for l in letters}
 
         for word in self._word_list:
             for letter in set(word):
-                letter_count = word.count(letter)
-                self._letter_count[letter][letter_count].add(word)
+                count = word.count(letter)
+                self._letter_count[letter][count].add(word)
+
+        # Make letter count frozensets
+        for letter in letters:
+            for count in range(1, word_length + 1):
+                self._letter_count[letter][count] = frozenset(self._letter_count[letter][count])
 
     @property
     def excluded_letters(self):
@@ -148,7 +162,7 @@ class GuessGroup(WordGroup):
                 superior_words = None
                 for index in range(word_length):
                     if word[index] not in excluded_letters:
-                        word_set = self._word_breakdown[index][word[index]].copy()
+                        word_set = set(self._word_breakdown[index][word[index]])
 
                         if superior_words is None:
                             superior_words = word_set
