@@ -87,6 +87,7 @@ class WordGroup:
     @property
     def excluded_letters(self):
         """Check which letters that can not be part of the solution"""
+        start = time.perf_counter()
         # Very inefficient method, hack for now
         included_letters = set()
         for word in self:
@@ -96,46 +97,20 @@ class WordGroup:
                 assert included_letters == set(letters)
                 break
 
-        return included_letters.symmetric_difference(letters)
+        excluded_letters = included_letters.symmetric_difference(letters)
+        stop = time.perf_counter()
+        print(f"Excluded letters calculated in {stop - start:.4f} seconds")
+        return excluded_letters
 
     def reset(self):
         if self.changed:
             self._word_list = self._prev_word_list.copy()
             self.changed = False
 
-# def gen_possible_words(word, excluded_letters):
-#     for index in range(len(word)):
-#         if word[index] in excluded_letters:
-#             prefix = word[:index]
-#             suffix = word[index + 1:]
-
-#             for letter in letters:
-#                 # Don't generate the same word
-#                 if letter != word[index]:
-#                     yield f"{prefix}{letter}{suffix}"
-
-#             if suffix:
-#                 for letter in excluded_letters.symmetric_difference(letters):
-#                     for postfix in gen_possible_words(suffix, excluded_letters):
-#                         yield f"{prefix}{letter}{postfix}"
-
 class GuessGroup(WordGroup):
     """
     Use results learned from playing the game to refine possible guesses.
     """
-    # def filter_guesses(self, excluded_letters):
-    #     # Filter out guesses that are not possible
-    #     # based on the result
-    #     # This is a very inefficient method, but it works
-    #     for word in sorted(self._word_list):
-    #         if excluded_letters.isdisjoint(word):
-    #             continue
-
-    #         for maybe_word in gen_possible_words(word, excluded_letters):
-    #             if maybe_word in self._word_list:
-    #                 self._word_list.remove(word)
-    #                 break
-
     def filter_guesses(self, excluded_letters):
         if self.changed:
             self._prev_word_list = self._word_list.copy()
@@ -329,32 +304,22 @@ class SolutionGroup(GuessGroup):
         # Foil is the result that keeps the most combinations
         return rank, foil
 
-    # def filter_guesses(self, excluded_letters):
-    #     """
-    #     Dummy function, in case we are playing hard mode,
-    #     where all guesses must be possible solutions.
-    #     """
-    #     # Filtering is already done by filter_solutions()
-    #     # No need to filter further
-    #     self.changed = True
-
-
 def best_guesses(guess_group, solution_group, progress = True):
     # Find the best next word
     best_guesses = []
     best_rank = None
 
     # Do not consider words that use letters that are already excluded
-    start = time.time()
+    start = time.perf_counter()
     full_word_list_count = len(guess_group)
     guess_group.filter_guesses(solution_group.excluded_letters)
-    stop = time.time()
+    stop = time.perf_counter()
 
     if progress:
         print(f"Filtered {full_word_list_count} words down to "
             f"{len(guess_group)} in {stop - start:.4f} seconds")
 
-    start = time.time()
+    start = time.perf_counter()
     for i, word in enumerate(guess_group):
         if progress and i % 100 == 0:
             print(f"Progress: {i * 100 / len(guess_group):.2f}% ({i} / {len(guess_group)})", end = "\r")
@@ -383,7 +348,7 @@ def best_guesses(guess_group, solution_group, progress = True):
         # Filter down to only guesses in solutions
         best_guesses = [
             guess for guess in best_guesses if guess in solution_group]
-    stop = time.time()
+    stop = time.perf_counter()
 
     if progress:
         print(f"Calculated Guesses in {stop - start:.3f} seconds")
