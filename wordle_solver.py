@@ -149,7 +149,12 @@ class GuessGroup(WordGroup):
         suspect_breakdown = {index: set() for index in range(1, word_length + 1)}
         for letter in excluded_letters:
             for word in self._word_contains[letter]:
-                suspect_breakdown[len(excluded_letters.intersection(word))].add(word)
+                count = 0
+                for index in range(word_length):
+                    if word[index] in excluded_letters:
+                        count += 1
+
+                suspect_breakdown[count].add(word)
 
         # Starting with the words with the most excluded letters
         # Since a word with only excluded letters will return result bbbbb
@@ -162,17 +167,15 @@ class GuessGroup(WordGroup):
                 superior_words = None
                 for index in range(word_length):
                     if word[index] not in excluded_letters:
-                        word_set = set(self._word_breakdown[index][word[index]])
+                        word_set = self._word_breakdown[index][word[index]]
 
                         if superior_words is None:
-                            superior_words = word_set
+                            superior_words = set(word_set)
                         else:
                             superior_words.intersection_update(word_set)
 
-                if superior_words is None:
-                    # Remove word if all letters are excluded
-                    self._word_list.remove(word)
-                    continue
+                assert superior_words is not None, \
+                    f"All letters in word {word} are excluded, but count is {count}"
 
                 # Remove superior words if they contain excluded letters
                 for other_count in range(count, word_length + 1):
@@ -348,7 +351,7 @@ def best_guesses(guess_group, solution_group, progress = True):
     stop = time.time()
 
     if progress:
-        print(f"Excluded {full_word_list_count} words down to "
+        print(f"Filtered {full_word_list_count} words down to "
             f"{len(guess_group)} in {stop - start:.4f} seconds")
 
     start = time.time()
