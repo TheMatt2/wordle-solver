@@ -104,12 +104,12 @@ def check_solutions_word_lists(solutions, word_list):
     for word in solutions + word_list:
         if len(word) != 5:
             raise ValueError(
-                "Word encountered that is not five letters: {:r}".format(word))
+                f"Word encountered that is not five letters: {word!r}")
 
         for c in word:
             if c not in letters:
                 raise ValueError(
-                    "Word encountered with illegal letter: {:r}".format(word))
+                    f"Word encountered with illegal letter: {word!r}")
 
     # There should be no duplicates
     solutions_set = set(solutions)
