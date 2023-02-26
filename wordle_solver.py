@@ -31,9 +31,8 @@ class WordGroup(BaseWordGroup):
     to the previous state if a guess is wrong using reset().
     """
     def __init__(self, word_list):
-        # Setup rollback state
+        # Save word list
         self._word_list = set(word_list)
-
 
         # Calculate stats for words
         self.prepare_stats()
@@ -161,6 +160,34 @@ class GuessGroup(WordGroup):
                 if superior_words:
                     # Remove word from list
                     self._word_list.remove(word)
+
+class AllWordsGuessGroup(BaseWordGroup):
+    """
+    Guess group that contains all possible combinations
+    of letters as words. Generates the list on the fly
+    to avoid needing to store all of it in memory.
+    """
+    def __init__(self):
+        self.excluded_letters = set()
+
+    def __len__(self):
+        return (len(LETTERS) - len(self.excluded_letters)) ** WORD_LENGTH
+
+    def __contains__(self, val):
+        if isinstance(val, str) and len(val) == WORD_LENGTH:
+            return self.excluded_letters.disjoint(val)
+        return False
+
+    def __iter__(self):
+        """Iterate over all possible words"""
+        # Use product() to create all words of possible letters
+        included_letters = self.excluded_letters.symmetric_difference(LETTERS)
+        for word in itertools.product(*[included_letters] * WORD_LENGTH):
+            yield "".join(word)
+
+    def filter_guesses(self, excluded_letters):
+        # Simplify save excluded letters
+        self.excluded_letters.update(excluded_letters)
 
 class BaseSolutionGroup(WordGroup):
     """

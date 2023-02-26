@@ -9,9 +9,10 @@ Two Wordle Games are currently supported:
 """
 import json
 import requests
+import itertools
 import urllib.parse
 
-from wordle_contexts import ALL_WORDS_TOKEN
+from wordle_contexts import ALL_WORDS_TOKEN, LETTERS, WORD_LENGTH
 
 NYTIMES_WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
 NYTIMES_WORDLE_JS_CRIB = 'src="https://www.nytimes.com/games-assets/v2/wordle.'
@@ -99,30 +100,32 @@ def scrap_wordlegame():
 
 def check_solutions_word_lists(solutions, word_list):
     # Verify solution and word lists make sense
-    for word in solutions + word_list:
-        if len(word) != 5:
-            raise ValueError(
-                f"Word encountered that is not five letters: {word!r}")
+    if word_list != ALL_WORDS_TOKEN:
+        words = itertools.chain(solutions, word_list)
+    else:
+        # Don't bother checking word list
+        words = solutions
+
+    for word in words:
+        if len(word) != WORD_LENGTH:
+            raise ValueError(f"{word!r} is not {WORD_LENGTH} letters: ")
 
         for c in word:
-            if c not in letters:
-                raise ValueError(
-                    f"Word encountered with illegal letter: {word!r}")
+            if c not in LETTERS:
+                raise ValueError(f"{word!r} has illegal letter {c!r}")
 
     # There should be no duplicates
     solutions_set = set(solutions)
     if len(solutions) != len(solutions_set):
-        raise ValueError(
-            "Solutions contains duplicate words")
+        raise ValueError("Solutions contains duplicate words")
 
-    word_list_set = set(word_list)
-    if len(word_list) != len(word_list_set):
-        raise ValueError(
-            "Word list contains duplicate words")
+    if word_list != ALL_WORDS_TOKEN:
+        word_list_set = set(word_list)
+        if len(word_list) != len(word_list_set):
+            raise ValueError("Word list contains duplicate words")
 
-    if not word_list_set.issuperset(solutions_set):
-        raise ValueError(
-            "Not all solutions are in word list")
+        if not word_list_set.issuperset(solutions_set):
+            raise ValueError("Not all solutions are in word list")
 
 FLAPPY_BIRDLE_URL = "https://flappybirdle.com"
 FLAPPY_BIRDLE_JS_CRIB = 'src="/static/js/main.'
@@ -158,10 +161,6 @@ def scrap_flappy_birdle():
     solutions_raw = wordle_js[solutions_start:solutions_stop]
     solutions = json.loads(solutions_raw)
 
-    # Birdle word list is all possible words
-    word_list = []
-
-    for word in itertools.product(*[letters] * 5):
-        word_list.append("".join(word))
-
-    return solutions, word_list
+    # # Birdle word list is all possible words
+    # Use magic token to indicate all words
+    return solutions, ALL_WORDS_TOKEN

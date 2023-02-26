@@ -1,11 +1,6 @@
 import wordle_solver
 import wordle_contexts
-
-# Top guesses
-# aesir
-# arise
-# raise
-# serai
+from wordle_contexts import ALL_WORDS_TOKEN, WORD_LENGTH
 
 def choose_context():
     print("Please select a Wordle version to use:")
@@ -52,12 +47,17 @@ def main():
     context = choose_context()
     solutions, word_list = wordle_contexts.load_solutions_word_list(context)
 
-    print(f"Loaded {len(word_list)} words.")
+    if word_list == ALL_WORDS_TOKEN:
+        print(f"Loaded 11881376 words.")
+    else:
+        print(f"Loaded {len(word_list)} words.")
+
     print(f"Loaded {len(solutions)} possible solutions.")
 
-    naive = input(
-        "Should the computer assume any word can be a solution?: "
-        ).strip() == "y"
+    # naive = input(
+    #     "Should the computer assume any word can be a solution?: "
+    #     ).strip() == "y"
+    naive = input("Naive Mode?: ").strip() == "y"
 
     if naive:
         solutions = word_list
@@ -67,6 +67,8 @@ def main():
 
     if hard_mode:
         guess_group = solution_group
+    elif word_list == ALL_WORDS_TOKEN:
+        guess_group = wordle_solver.AllWordsGuessGroup()
     else:
         guess_group = wordle_solver.GuessGroup(word_list)
 
@@ -90,6 +92,10 @@ def main():
     while True:
         while True:
             word = input("Word: ").strip()
+
+            if len(word) == WORD_LENGTH and word_list == ALL_WORDS_TOKEN:
+                # Skip word list check
+                break
 
             if word in word_list:
                 # Valid, exit
