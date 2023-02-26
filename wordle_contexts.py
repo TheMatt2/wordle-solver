@@ -6,6 +6,11 @@ import json
 
 import wordle_scraper
 
+WORD_LENGTH = 5
+LETTERS = "abcdefghijklmnopqrstuvwxyz"
+
+ALL_WORDS_TOKEN = "ALL_WORDS_ARE_VALID_GUESSES"
+
 WORDLE_CONTEXTS = ["new_york_times", "wordlegame_org", "flappy_birdle"]
 
 WORDLE_CONTEXTS_COMMON_NAME = {

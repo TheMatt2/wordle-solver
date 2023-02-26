@@ -2,16 +2,13 @@ import time
 import itertools
 from abc import ABCMeta, abstractmethod
 
-word_length = 5
-letters = "abcdefghijklmnopqrstuvwxyz"
+from wordle_contexts import LETTERS, WORD_LENGTH
 
 class BaseWordGroup(metaclass = ABCMeta):
     """
     Base class to represent a group of words, and
     calculate statistics on them.
     """
-
-    # Act like a list of words
     @abstractmethod
     def __len__(self): pass
 
@@ -60,32 +57,34 @@ class WordGroup(BaseWordGroup):
         """Calculate statistics for the current word list"""
         # Word breakdown
         self._word_breakdown = [
-            {l: set() for l in letters}
-             for i in range(word_length)]
+            {l: set() for l in LETTERS} for i in range(WORD_LENGTH)]
 
         for word in self._word_list:
-            for index in range(word_length):
+            for index in range(WORD_LENGTH):
                 self._word_breakdown[index][word[index]].add(word)
 
         # Make Word breakdown frozensets
-        for index in range(word_length):
-            for letter in letters:
-                self._word_breakdown[index][letter] = frozenset(self._word_breakdown[index][letter])
+        for index in range(WORD_LENGTH):
+            for letter in LETTERS:
+                self._word_breakdown[index][letter] = frozenset(
+                    self._word_breakdown[index][letter])
 
         # Word contains
-        self._word_contains = {l: set() for l in letters}
-        for letter in letters:
-            for index in range(word_length):
-                self._word_contains[letter].update(self._word_breakdown[index][letter])
+        self._word_contains = {l: set() for l in LETTERS}
+        for letter in LETTERS:
+            for index in range(WORD_LENGTH):
+                self._word_contains[letter].update(
+                    self._word_breakdown[index][letter])
 
         # Make Word contains frozensets
-        for letter in letters:
+        for letter in LETTERS:
             self._word_contains[letter] = frozenset(self._word_contains[letter])
 
         # Letter count
         # Create a bucket for each letter and count of that letter in word
         # Note that some buckets will always be empty
-        self._letter_count = {l: {c: set() for c in range(1, word_length + 1)} for l in letters}
+        self._letter_count = {
+            l: {c: set() for c in range(1, WORD_LENGTH + 1)} for l in LETTERS}
 
         for word in self._word_list:
             for letter in set(word):
@@ -93,8 +92,8 @@ class WordGroup(BaseWordGroup):
                 self._letter_count[letter][count].add(word)
 
         # Make letter count frozensets
-        for letter in letters:
-            for count in range(1, word_length + 1):
+        for letter in LETTERS:
+            for count in range(1, WORD_LENGTH + 1):
                 self._letter_count[letter][count] = frozenset(
                     self._letter_count[letter][count])
 
@@ -105,12 +104,12 @@ class WordGroup(BaseWordGroup):
         included_letters = set()
         for word in self:
             included_letters.update(word)
-            if len(included_letters) == len(letters):
+            if len(included_letters) == len(LETTERS):
                 # All letters are present
-                assert included_letters == set(letters)
+                assert included_letters == set(LETTERS)
                 break
 
-        excluded_letters = included_letters.symmetric_difference(letters)
+        excluded_letters = included_letters.symmetric_difference(LETTERS)
         return excluded_letters
 
 class GuessGroup(WordGroup):
@@ -124,11 +123,11 @@ class GuessGroup(WordGroup):
         self.prepare_stats()
 
         # Create a set of all words that contain excluded letters, grouped by count
-        suspect_breakdown = {index: set() for index in range(1, word_length + 1)}
+        suspect_breakdown = {index: set() for index in range(1, WORD_LENGTH + 1)}
         for letter in excluded_letters:
             for word in self._word_contains[letter]:
                 count = 0
-                for index in range(word_length):
+                for index in range(WORD_LENGTH):
                     if word[index] in excluded_letters:
                         count += 1
 
@@ -137,13 +136,13 @@ class GuessGroup(WordGroup):
         # Starting with the words with the most excluded letters
         # Since a word with only excluded letters will return result bbbbb
         # There is no information to be gained from it
-        self._word_list.difference_update(suspect_breakdown[word_length])
+        self._word_list.difference_update(suspect_breakdown[WORD_LENGTH])
 
-        for count in range(word_length - 1, 0, -1):
+        for count in range(WORD_LENGTH - 1, 0, -1):
             for word in suspect_breakdown[count]:
                 # Check if a word exists that contains all of the non-excluded letters
                 superior_words = None
-                for index in range(word_length):
+                for index in range(WORD_LENGTH):
                     if word[index] not in excluded_letters:
                         word_set = self._word_breakdown[index][word[index]]
 
@@ -156,7 +155,7 @@ class GuessGroup(WordGroup):
                     f"All letters in word {word} are excluded, but count is {count}"
 
                 # Remove superior words if they contain excluded letters
-                for other_count in range(count, word_length + 1):
+                for other_count in range(count, WORD_LENGTH + 1):
                     superior_words.difference_update(suspect_breakdown[other_count])
 
                 if superior_words:
@@ -194,7 +193,7 @@ class BaseSolutionGroup(WordGroup):
             self._word_list = self._prev_word_list.copy()
             self.changed = False
 
-RESULTS = ["".join(result) for result in itertools.product(*["gyb"] * word_length)]
+RESULTS = ["".join(result) for result in itertools.product(*["gyb"] * WORD_LENGTH)]
 
 # You can't have 4 known letters, and 1 incorrectly positioned
 RESULTS = [result for result in RESULTS if result.count("y") != 1 or "b" in result]
@@ -204,7 +203,7 @@ def result_possible(word, result):
     # If a letter is duplicated, then the first instance must be found
     absent = set()
 
-    for index in range(word_length):
+    for index in range(WORD_LENGTH):
         if result[index] == "b":
             absent.add(word[index])
         elif result[index] == "y":
@@ -227,7 +226,7 @@ class SolutionGroup(BaseSolutionGroup):
             # as it is about to be changed
             self.changed = True
 
-        for index in range(word_length):
+        for index in range(WORD_LENGTH):
             if result[index] == "g":
                 # Keep only words that have that letter in that position
                 self._word_list.intersection_update(self._word_breakdown[index][word[index]])
@@ -255,7 +254,7 @@ class SolutionGroup(BaseSolutionGroup):
                 correct_count = 0
 
                 indexes = []
-                for index in range(word_length):
+                for index in range(WORD_LENGTH):
                     if word[index] != letter:
                         continue
 

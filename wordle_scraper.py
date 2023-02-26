@@ -7,13 +7,11 @@ Two Wordle Games are currently supported:
  - https://wordlegame.org
  - https://www.nytimes.com/games/wordle
 """
-
 import json
 import requests
-import itertools
 import urllib.parse
 
-letters = "abcdefghijklmnopqrstuvwxyz"
+from wordle_contexts import ALL_WORDS_TOKEN
 
 NYTIMES_WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
 NYTIMES_WORDLE_JS_CRIB = 'src="https://www.nytimes.com/games-assets/v2/wordle.'

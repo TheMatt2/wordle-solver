@@ -2,6 +2,7 @@ import time
 
 import wordle_solver
 import wordle_contexts
+from wordle_contexts import LETTERS, WORD_LENGTH
 
 # Use coloring if avaliable
 try:
@@ -23,9 +24,6 @@ else:
 
         return "".join(coloring) + Back.RESET + f" ({result})"
 
-word_length = 5
-letters = "abcdefghijklmnopqrstuvwxyz"
-
 def wordle_result(guess, solution):
     """Given a guess and solution, generate the coloring wordle would show"""
     # Result calculation is basically check if guess letter matches
@@ -33,10 +31,10 @@ def wordle_result(guess, solution):
     # letters.
 
     # "u" is unassigned temporary value
-    result = ["u"] * word_length
+    result = ["u"] * WORD_LENGTH
 
     # First Pass, Correct and Absent
-    for index in range(word_length):
+    for index in range(WORD_LENGTH):
         if guess[index] == solution[index]:
             # Correct
             result[index] = "g"
@@ -46,14 +44,14 @@ def wordle_result(guess, solution):
 
     # Second Pass Count Remaining Letters
     # Count letters
-    solution_letters = {l: 0 for l in letters}
-    for index in range(word_length):
+    solution_letters = {l: 0 for l in LETTERS}
+    for index in range(WORD_LENGTH):
         if result[index] != "g":
             solution_letters[solution[index]] += 1
 
     # Third Pass
     # Mark Present
-    for index in range(word_length):
+    for index in range(WORD_LENGTH):
         if result[index] == "u":
             # Evaluate if Present
             assert guess[index] in solution
