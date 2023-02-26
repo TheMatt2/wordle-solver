@@ -1,10 +1,33 @@
 import time
 import itertools
+from abc import ABCMeta, abstractmethod
 
 word_length = 5
 letters = "abcdefghijklmnopqrstuvwxyz"
 
-class WordGroup:
+class BaseWordGroup(metaclass = ABCMeta):
+    """
+    Base class to represent a group of words, and
+    calculate statistics on them.
+    """
+
+    # Act like a list of words
+    @abstractmethod
+    def __len__(self): pass
+
+    @abstractmethod
+    def __contains__(self, val): pass
+
+    @abstractmethod
+    def __iter__(self): pass
+
+    def __bool__(self):
+        return len(self) > 0
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} with {len(self)} words>"
+
+class WordGroup(BaseWordGroup):
     """
     Keep statistics on the words for refining solutions and guesses.
     Keeps an "undo" state, so that the word list can be rolled back
@@ -12,21 +35,11 @@ class WordGroup:
     """
     def __init__(self, word_list):
         # Setup rollback state
-        self._prev_word_list = set(word_list)
-        self._word_list = self._prev_word_list.copy()
-        self.changed = False
+        self._word_list = set(word_list)
 
-        # Internal statistics
-        # Must be internal, because they are only calculated as needed
-        # and backup state is lost
-
-        # actually initialized in calculate_stats()
-        self._word_breakdown = None
-        self._word_contains = None
-        self._letter_count = None
 
         # Calculate stats for words
-        self.calculate_stats()
+        self.prepare_stats()
 
     def __len__(self):
         return len(self._word_list)
@@ -43,7 +56,7 @@ class WordGroup:
     def __repr__(self):
         return f"<WordStats with {len(self)} words>"
 
-    def calculate_stats(self):
+    def prepare_stats(self):
         """Calculate statistics for the current word list"""
         # Word breakdown
         self._word_breakdown = [
@@ -82,13 +95,13 @@ class WordGroup:
         # Make letter count frozensets
         for letter in letters:
             for count in range(1, word_length + 1):
-                self._letter_count[letter][count] = frozenset(self._letter_count[letter][count])
+                self._letter_count[letter][count] = frozenset(
+                    self._letter_count[letter][count])
 
     @property
     def excluded_letters(self):
         """Check which letters that can not be part of the solution"""
-        start = time.perf_counter()
-        # Very inefficient method, hack for now
+        # Inefficient method, but seems fast enough
         included_letters = set()
         for word in self:
             included_letters.update(word)
@@ -98,28 +111,18 @@ class WordGroup:
                 break
 
         excluded_letters = included_letters.symmetric_difference(letters)
-        stop = time.perf_counter()
-        print(f"Excluded letters calculated in {stop - start:.4f} seconds")
         return excluded_letters
-
-    def reset(self):
-        if self.changed:
-            self._word_list = self._prev_word_list.copy()
-            self.changed = False
 
 class GuessGroup(WordGroup):
     """
     Use results learned from playing the game to refine possible guesses.
     """
     def filter_guesses(self, excluded_letters):
-        if self.changed:
-            self._prev_word_list = self._word_list.copy()
-            self.calculate_stats()
-        else:
-            self.changed = True
+        """
+        Filter out guesses that are not possible based on excluded letters
+        """
+        self.prepare_stats()
 
-        # Filter out guesses that are not possible
-        # based on the result
         # Create a set of all words that contain excluded letters, grouped by count
         suspect_breakdown = {index: set() for index in range(1, word_length + 1)}
         for letter in excluded_letters:
@@ -160,6 +163,37 @@ class GuessGroup(WordGroup):
                     # Remove word from list
                     self._word_list.remove(word)
 
+class BaseSolutionGroup(WordGroup):
+    """
+    Keep statistics and manipulation for solutions.
+    Keep an internal reset state for repeated filtering.
+    """
+    def __init__(self, word_list):
+        super().__init__(word_list)
+
+        # Setup internal state
+        self._prev_word_list = self._word_list.copy()
+        self.changed = False
+
+    @abstractmethod
+    def filter_solutions(self, word, result):
+        """Filter solutions based on the result of the guess"""
+        pass
+
+    @abstractmethod
+    def guess_rank(self, guess):
+        """
+        Calculate rank of a word in this group. Higher rank is better guess.
+        """
+        pass
+
+    def reset(self):
+        if self.changed:
+            assert self._prev_word_list is not None, \
+                "Reset state has never been set, yet word list is changed"
+            self._word_list = self._prev_word_list.copy()
+            self.changed = False
+
 RESULTS = ["".join(result) for result in itertools.product(*["gyb"] * word_length)]
 
 # You can't have 4 known letters, and 1 incorrectly positioned
@@ -179,15 +213,18 @@ def result_possible(word, result):
                 return False
     return True
 
-class SolutionGroup(GuessGroup):
+class SolutionGroup(BaseSolutionGroup):
     """
     Use results learned from playing the game to refine possible solutions.
     """
     def filter_solutions(self, word, result):
         if self.changed:
+            # If the word list has changed, update the stats
             self._prev_word_list = self._word_list.copy()
-            self.calculate_stats()
+            self.prepare_stats()
         else:
+            # Otherwise, mark the list as changed,
+            # as it is about to be changed
             self.changed = True
 
         for index in range(word_length):
@@ -248,7 +285,8 @@ class SolutionGroup(GuessGroup):
     def guess_rank(self, guess):
         """
         Calculate rank of a word in this group. Higher rank means better guess.
-        Uses interal reset state."""
+        Uses internal reset state.
+        """
         # If word has repeated letters, right gives the same amount of information,
         # positions gives a bit less, wrong gives a fair bit less information
         # Rank = Sum [Pr[permutation] * information]
@@ -286,7 +324,9 @@ class SolutionGroup(GuessGroup):
                 total += part # Sanity check
 
             assert processed_words.isdisjoint(self._word_list), \
-                f"Results have overlapping words: {processed_words.intersection(self._word_list)}"
+                f"Results have overlapping words: " \
+                f"{processed_words.intersection(self._word_list)}"
+
             processed_words.update(self._word_list)
 
             # Rank is the highest count of words that can result
