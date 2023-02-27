@@ -2,6 +2,7 @@
 Utility functions to help with display progress and
 time taken.
 """
+import sys
 import time
 
 try:
@@ -10,7 +11,7 @@ except NameError:
     clear_line = lambda: None
 
 def progress_bar(iterable, ticks = 10, delay = 0.5,
-                persist = True, enabled = True, timer = time.perf_counter):
+                persist = False, enabled = None, timer = time.perf_counter):
     """
     Show a simply progress bar for iterable.
     iterable: The object to return items from.
@@ -18,8 +19,12 @@ def progress_bar(iterable, ticks = 10, delay = 0.5,
     delay: Delay in seconds before showing the progress bar.
     persist: Should the progress bar be cleared at the end.
     enabled: If false, disable the progress bar.
+        If None, enable if output is tty.
     timer: Function to use for time.
     """
+    if enabled is None:
+        enabled = sys.stdout.isatty()
+
     if not enabled:
         # Just return the values.
         yield from iterable
@@ -71,9 +76,12 @@ def progress_bar(iterable, ticks = 10, delay = 0.5,
         print(clear_line(), end = "")
 
     # Print final progress
-    print_progress(count + 1, length, start, timer())
+    print_progress(count, length, start, timer())
 
-    if not persist:
+    if persist:
+        # Show progress bar permanently.
+        print()
+    else:
         # Use format code to clear progress bar
         print(clear_line(), end = "")
 
