@@ -2,6 +2,7 @@ import time
 import itertools
 from abc import ABCMeta, abstractmethod
 
+from wordle_utils import progress_bar
 from wordle_contexts import LETTERS, WORD_LENGTH
 
 class BaseWordGroup(metaclass = ABCMeta):
@@ -385,11 +386,7 @@ def best_guesses(guess_group, solution_group, progress = True):
         print(f"Filtered {full_word_list_count} words down to "
             f"{len(guess_group)} in {stop - start:.4f} seconds")
 
-    start = time.perf_counter()
-    for i, word in enumerate(guess_group):
-        if progress and i % 100 == 0:
-            print(f"Progress: {i * 100 / len(guess_group):.2f}% ({i} / {len(guess_group)})", end = "\r")
-
+    for word in progress_bar(guess_group, persist = progress):
         rank, foil = solution_group.guess_rank(word)
 
         if not best_rank or rank < best_rank:
@@ -398,9 +395,6 @@ def best_guesses(guess_group, solution_group, progress = True):
 
         elif rank == best_rank:
             best_guesses.append(word)
-
-    if progress:
-        print(f"Progress: 100.00% ({len(guess_group)} / {len(guess_group)})")
 
     # If a guess is in the solution set, that actually makes it
     # better than any other option

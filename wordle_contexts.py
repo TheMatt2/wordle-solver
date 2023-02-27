@@ -76,6 +76,7 @@ def load_solutions_word_list(context):
             word_list.sort()
     else:
         # Get results from internet
+        print("Getting solutions and word list from internet.")
         solutions, word_list = WORDLE_CONTEXTS_SCRAPER[context]()
 
         # Verify results are valid
