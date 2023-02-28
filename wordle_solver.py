@@ -423,6 +423,9 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
 
     if mp:
         # Use multiprocessing to accelerate processing
+        if progress:
+            print(f"Calculating Guesses using {os.cpu_count()} processes...")
+
         processes = []
         chunksize = math.ceil(len(guess_group) / os.cpu_count())
         queue = Queue()
