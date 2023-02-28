@@ -92,4 +92,4 @@ def print_progress(count, length, start, stop):
     elapsed = stop - start
     projected = max((stop - start) * (1. / count * length - 1), 0)
     print(f"Progress: {percent} ({ratio}) Elapsed: {elapsed:.2f} s "
-          f"Remaining: {projected:.2f} s", end = "\r")
+          f"Remaining: {projected:.2f} sec", end = "\r")

@@ -138,8 +138,8 @@ def test_wordle(context, naive, solution = None):
     stop = time.perf_counter()
 
     print(
-        f"Test: {wordle_contexts.get_common_name(context)}, Naive: {naive}, "
-        f"Solution: {solution}, Duration: {stop - start:.4f} seconds\n")
+        f"Test: {wordle_contexts.get_common_name(context)} Naive: {naive} "
+        f"Solution: {solution} Duration: {stop - start:.4f} sec\n")
 
 def main():
     init()
@@ -152,7 +152,7 @@ def main():
         test_wordle("wordlegame_org", True, solution)
 
     stop = time.perf_counter()
-    print(f"Tests duration {stop - start:.4f}")
+    print(f"Tests duration {stop - start:.4f} sec")
 
 if __name__ == "__main__":
     main()

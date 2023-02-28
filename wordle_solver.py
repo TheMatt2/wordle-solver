@@ -19,11 +19,17 @@ class BaseWordGroup(metaclass = ABCMeta):
     @abstractmethod
     def __iter__(self): pass
 
+    def __copy__(self):
+        return self.copy()
+
     def __bool__(self):
         return len(self) > 0
 
     def __repr__(self):
         return f"<{self.__class__.__name__} with {len(self)} words>"
+
+    @abstractmethod
+    def copy(self): pass
 
 class WordGroup(BaseWordGroup):
     """
@@ -52,6 +58,9 @@ class WordGroup(BaseWordGroup):
 
     def __repr__(self):
         return f"<WordStats with {len(self)} words>"
+
+    def copy(self):
+        return self.__class__(self._word_list)
 
     def prepare_stats(self):
         """Calculate statistics for the current word list"""
@@ -168,8 +177,11 @@ class AllWordsGuessGroup(BaseWordGroup):
     of letters as words. Generates the list on the fly
     to avoid needing to store all of it in memory.
     """
-    def __init__(self):
-        self.excluded_letters = set()
+    def __init__(self, excluded_letters = None):
+        if excluded_letters is None:
+            excluded_letters = set()
+
+        self.excluded_letters = excluded_letters
 
     def __len__(self):
         return (len(LETTERS) - len(self.excluded_letters)) ** WORD_LENGTH
@@ -185,6 +197,9 @@ class AllWordsGuessGroup(BaseWordGroup):
         included_letters = self.excluded_letters.symmetric_difference(LETTERS)
         for word in itertools.product(*[included_letters] * WORD_LENGTH):
             yield "".join(word)
+
+    def copy(self):
+        return self.__class__(self.excluded_letters)
 
     def filter_guesses(self, excluded_letters):
         # Simplify save excluded letters
@@ -371,7 +386,27 @@ class SolutionGroup(BaseSolutionGroup):
         # Foil is the result that keeps the most combinations
         return rank, foil
 
-def best_guesses(guess_group, solution_group, progress = True):
+    def _guess_rank_mp(self, guess_group, queue):
+        best_guesses = []
+        best_rank = None
+
+        for word in guess_group:
+            rank, foil = self.guess_rank(word)
+
+            if not best_rank or rank < best_rank:
+                best_rank = rank
+                best_guesses = [word]
+
+            elif rank == best_rank:
+                best_guesses.append(word)
+
+        queue.put((best_guesses, best_rank))
+
+import os
+import math
+from multiprocessing import Process, Queue
+
+def best_guesses(guess_group, solution_group, progress = True, mp = True):
     # Find the best next word
     best_guesses = []
     best_rank = None
@@ -384,17 +419,47 @@ def best_guesses(guess_group, solution_group, progress = True):
 
     if progress:
         print(f"Filtered {full_word_list_count} words down to "
-            f"{len(guess_group)} in {stop - start:.4f} seconds")
+            f"{len(guess_group)} in {stop - start:.4f} sec")
 
-    for word in progress_bar(guess_group, persist = progress):
-        rank, foil = solution_group.guess_rank(word)
+    if mp:
+        # Use multiprocessing to accelerate processing
+        processes = []
+        chunksize = math.ceil(len(guess_group) / os.cpu_count())
+        queue = Queue()
 
-        if not best_rank or rank < best_rank:
-            best_rank = rank
-            best_guesses = [word]
+        guess_list = list(guess_group)
+        for i in range(os.cpu_count()):
+            process = Process(target = solution_group.copy()._guess_rank_mp,
+                args = (guess_list[chunksize * i: chunksize * (i + 1)], queue))
+            processes.append(process)
 
-        elif rank == best_rank:
-            best_guesses.append(word)
+        for process in processes:
+            process.start()
+
+        for process in processes:
+            process.join()
+
+        # Collect results
+        while not queue.empty():
+            guesses, rank = queue.get()
+
+            if not best_rank or rank < best_rank:
+                best_rank = rank
+                best_guesses = guesses
+
+            elif rank == best_rank:
+                best_guesses.extend(guesses)
+    else:
+        # Use single process
+        for word in progress_bar(guess_group, persist = progress):
+            rank, foil = solution_group.guess_rank(word)
+
+            if not best_rank or rank < best_rank:
+                best_rank = rank
+                best_guesses = [word]
+
+            elif rank == best_rank:
+                best_guesses.append(word)
 
     # If a guess is in the solution set, that actually makes it
     # better than any other option
@@ -408,6 +473,7 @@ def best_guesses(guess_group, solution_group, progress = True):
         # Filter down to only guesses in solutions
         best_guesses = [
             guess for guess in best_guesses if guess in solution_group]
+
     stop = time.perf_counter()
 
     if progress:
