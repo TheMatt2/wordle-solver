@@ -82,7 +82,8 @@ def load_solutions_word_list(context):
         # Verify results are valid
         wordle_scraper.check_solutions_word_lists(solutions, word_list)
         solutions.sort()
-        word_list.sort()
+        if word_list != ALL_WORDS_TOKEN:
+            word_list.sort()
 
         # Save results to cache
         if not os.path.exists(WORDLE_CACHE):
