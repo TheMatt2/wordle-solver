@@ -89,7 +89,33 @@ def print_progress(count, length, start, stop):
     """Format progress bar"""
     percent = f"{count * 100 / length:.2f}%"
     ratio = f"{count} / {length}"
-    elapsed = stop - start
+    elapsed = duration_fmt(stop - start)
     projected = max((stop - start) * (1. / count * length - 1), 0)
-    print(f"Progress: {percent} ({ratio}) Elapsed: {elapsed:.2f} s "
-          f"Remaining: {projected:.2f} sec", end = "\r")
+    projected = duration_fmt(projected)
+
+    print(f"Progress: {percent} ({ratio}) Elapsed: {elapsed} "
+          f"Remaining: {projected}", end = "\r")
+
+SECONDS_PER_MINUTE = 60.
+SECONDS_PER_HOUR = 60. * 60
+SECONDS_PER_DAY = 60. * 60 * 24
+
+def duration_fmt(duration):
+    """Format duration in seconds as a string."""
+    parts = []
+
+    if duration > SECONDS_PER_DAY:
+        days, duration = divmod(duration, SECONDS_PER_DAY)
+        parts.append(f"{days:.0f} days")
+
+    if duration > SECONDS_PER_HOUR:
+        hours, duration = divmod(duration, SECONDS_PER_HOUR)
+        parts.append(f"{hours:.0f} hr")
+
+    if duration > SECONDS_PER_MINUTE:
+        minutes, duration = divmod(duration, SECONDS_PER_MINUTE)
+        parts.append(f"{minutes:.0f} min")
+
+    parts.append(f"{duration:.2f} sec")
+
+    return " ".join(parts)
