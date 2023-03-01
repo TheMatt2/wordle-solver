@@ -402,9 +402,8 @@ class SolutionGroup(BaseSolutionGroup):
 
         queue.put((best_guesses, best_rank))
 
-import os
 import math
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, cpu_count
 
 def best_guesses(guess_group, solution_group, progress = True, mp = True):
     # Find the best next word
@@ -421,17 +420,20 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
         print(f"Filtered {full_word_list_count} words down to "
             f"{len(guess_group)} in {stop - start:.4f} sec")
 
+    if mp is True:
+        mp = cpu_count()
+
     if mp:
         # Use multiprocessing to accelerate processing
         if progress:
-            print(f"Calculating Guesses using {os.cpu_count()} processes...")
+            print(f"Calculating Guesses using {mp} processes...")
 
         processes = []
-        chunksize = math.ceil(len(guess_group) / os.cpu_count())
+        chunksize = math.ceil(len(guess_group) / mp)
         queue = Queue()
 
         guess_list = list(guess_group)
-        for i in range(os.cpu_count()):
+        for i in range(mp):
             process = Process(target = solution_group.copy()._guess_rank_mp,
                 args = (guess_list[chunksize * i: chunksize * (i + 1)], queue))
             processes.append(process)
