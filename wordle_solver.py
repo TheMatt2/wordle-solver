@@ -2,7 +2,7 @@ import time
 import itertools
 from abc import ABCMeta, abstractmethod
 
-from wordle_utils import progress_bar
+from wordle_utils import progress_bar, ProgressBarMP
 from wordle_contexts import LETTERS, WORD_LENGTH
 
 class BaseWordGroup(metaclass = ABCMeta):
@@ -431,15 +431,22 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
         processes = []
         chunksize = math.ceil(len(guess_group) / mp)
         queue = Queue()
+        progress_bar_mp = ProgressBarMP(persist = progress)
 
+        # So we can directly index it
         guess_list = list(guess_group)
+
         for i in range(mp):
             process = Process(target = solution_group.copy()._guess_rank_mp,
-                args = (guess_list[chunksize * i: chunksize * (i + 1)], queue))
+                args = (progress_bar_mp.worker_loop(guess_list[chunksize * i: chunksize * (i + 1)]),
+                        queue))
+
             processes.append(process)
 
         for process in processes:
             process.start()
+
+        progress_bar_mp.parent_loop()
 
         for process in processes:
             process.join()
