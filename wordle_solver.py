@@ -413,10 +413,12 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
     # Do not consider words that use letters that are already excluded
     start = time.perf_counter()
     full_word_list_count = len(guess_group)
-    guess_group.filter_guesses(solution_group.excluded_letters)
+    excluded_letters = solution_group.excluded_letters
+    guess_group.filter_guesses(excluded_letters)
     stop = time.perf_counter()
 
-    if progress:
+    # Say how many words were filtered out, if there are excluded letters
+    if progress and excluded_letters:
         print(f"Filtered {full_word_list_count} words down to "
             f"{len(guess_group)} in {stop - start:.4f} secs")
 

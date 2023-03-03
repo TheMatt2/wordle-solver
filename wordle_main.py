@@ -17,7 +17,6 @@ def choose_context():
             continue
 
         choice = int(choice)
-
         if choice > len(contexts):
             print(f"Invalid wordle version choice {choice!r}")
             continue
@@ -34,7 +33,7 @@ def print_first(guesses, count = 10):
 def is_result(result):
     # Check if this is a valid result
     # 5 letters, bgy
-    if len(result) != 5:
+    if len(result) != WORD_LENGTH:
         return False
 
     if not {"b", "g", "y"}.issuperset(result):
@@ -48,17 +47,13 @@ def main():
     solutions, word_list = wordle_contexts.load_solutions_word_list(context)
 
     if word_list == ALL_WORDS_TOKEN:
-        print(f"Loaded 11881376 words.")
+        print(f"Loaded {26 ** WORD_LENGTH} words.")
     else:
         print(f"Loaded {len(word_list)} words.")
 
     print(f"Loaded {len(solutions)} possible solutions.")
 
-    # naive = input(
-    #     "Should the computer assume any word can be a solution?: "
-    #     ).strip() == "y"
     naive = input("Naive Mode?: ").strip() == "y"
-
     if naive:
         solutions = word_list
 
