@@ -150,9 +150,9 @@ def pickleable_generator(generator):
     """
     @wraps(generator)
     def wrapper(*args, **kwargs):
-        #return PickleGenerator(generator, *args, **kwargs)
         return PickleGenerator(generator, *args, **kwargs)
 
+    # Update qualified name so pickling works correctly
     generator.__qualname__ += ".__wrapped__"
     return wrapper
 

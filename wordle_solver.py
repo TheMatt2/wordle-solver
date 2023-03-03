@@ -418,7 +418,7 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
 
     if progress:
         print(f"Filtered {full_word_list_count} words down to "
-            f"{len(guess_group)} in {stop - start:.4f} sec")
+            f"{len(guess_group)} in {stop - start:.4f} secs")
 
     if mp is True:
         mp = cpu_count()
@@ -489,6 +489,6 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
     stop = time.perf_counter()
 
     if progress:
-        print(f"Calculated Guesses in {stop - start:.3f} seconds")
+        print(f"Calculated Guesses in {stop - start:.3f} secs")
 
     return best_guesses, best_rank
