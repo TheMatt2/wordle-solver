@@ -2,6 +2,9 @@ import time
 import itertools
 from abc import ABCMeta, abstractmethod
 
+import math
+from multiprocessing import Process, Queue, cpu_count
+
 from wordle_utils import progress_bar, ProgressBarMP
 from wordle_contexts import LETTERS, WORD_LENGTH
 
@@ -127,7 +130,7 @@ class GuessGroup(WordGroup):
     """
     def filter_guesses(self, excluded_letters):
         """
-        Filter out guesses that are not possible based on excluded letters
+        Filter out guesses that are not possible based on excluded letters.
         """
         self.prepare_stats()
 
@@ -401,9 +404,6 @@ class SolutionGroup(BaseSolutionGroup):
                 best_guesses.append(word)
 
         queue.put((best_guesses, best_rank))
-
-import math
-from multiprocessing import Process, Queue, cpu_count
 
 def best_guesses(guess_group, solution_group, progress = True, mp = True):
     # Find the best next word
