@@ -60,7 +60,11 @@ def main():
         solutions = word_list
 
     solution_group = wordle_solver.SolutionGroup(solutions)
-    hard_mode = input("Hard Mode?: ").strip() == "y"
+
+    # Hard mode doesn't work yet, disable for now
+    # TODO support hard mode
+    ## hard_mode = input("Hard Mode?: ").strip() == "y"
+    hard_mode = False
 
     if hard_mode:
         guess_group = solution_group
