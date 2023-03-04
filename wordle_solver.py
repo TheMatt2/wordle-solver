@@ -433,7 +433,7 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
         processes = []
         chunksize = math.ceil(len(guess_group) / mp)
         queue = Queue()
-        progress_bar_mp = ProgressBarMP(persist = progress)
+        progress_bar_mp = ProgressBarMP(mp, persist = progress)
 
         # So we can directly index it
         guess_list = list(guess_group)

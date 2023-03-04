@@ -160,9 +160,10 @@ class ProgressBarMP:
     """
     Show a progress bar for multiprocessing.
     """
-    def __init__(self, ticks = 10, delay = 0.5,
+    def __init__(self, processes, ticks = 10, delay = 0.5,
                 persist = False, enabled = None, timer = time.perf_counter):
         """
+        processes: Number of processes that will be used.
         ticks: Maximum number of updates per second.
         delay: Delay in seconds before showing the progress bar.
         persist: Should the progress bar be cleared at the end.
@@ -173,6 +174,7 @@ class ProgressBarMP:
         if enabled is None:
             enabled = sys.stdout.isatty()
 
+        self.processes_total = processes
         self.ticks = ticks
         self.delay = delay
         self.persist = persist
@@ -187,6 +189,7 @@ class ProgressBarMP:
         lock = RLock()
         self.count = Value("i", 0, lock = lock)
         self.length = Value("i", 0, lock = lock)
+        self.processes_count = Value("i", 0, lock = lock)
 
     @pickleable_generator
     def worker_loop(self, iterable, length = None):
@@ -199,6 +202,15 @@ class ProgressBarMP:
         if not self.enabled:
             yield from iterable
             return
+
+        # Register process
+        with self.processes_count.get_lock():
+            if self.processes_count.value >= self.processes_total:
+                # Too many processes
+                raise RuntimeError(
+                    f"{self.processes_total} have already been created.")
+
+            self.processes_count.value += 1
 
         if length is None:
             length = len(iterable)
@@ -244,13 +256,27 @@ class ProgressBarMP:
         if not self.enabled:
             return
 
+        # Start timing
+        start = self.timer()
+
         # Just wait for delay period to pass.
         time.sleep(self.delay)
 
         # Start showing progress bar
-        start = self.timer()
         tick_duration = 1 / self.ticks
         progress_shown = False
+
+        # Wait for all workers to start
+        while True:
+            with self.processes_count.get_lock():
+                if self.processes_count.value == self.processes_total:
+                    break
+
+                assert self.processes_count.value < self.processes_total, \
+                    f"{self.processes_count.value} processes have been created" \
+                    f" when only {self.processes_total} were expected."
+
+            time.sleep(tick_duration)
 
         while True:
             # Get count, length
