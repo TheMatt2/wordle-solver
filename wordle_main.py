@@ -2,6 +2,25 @@ import wordle_solver
 import wordle_contexts
 from wordle_contexts import ALL_WORDS_TOKEN, WORD_LENGTH
 
+# TODOs
+# - Implement non-heuristic solver
+#   - Support hard mode
+#   - Prove the heuristic solver is optimal
+#   - Min-max both turns to completion, but also use
+#     average for tie breaking
+#   - Rearrange solver hard mode for "all words" is less awkward
+#   - Explore a linear search, like what would be needed for "all words"
+#     may have a performance advantage
+#
+# - Support multiple word lengths
+#   - Add additional contexts
+#   - Cleanup frontend to support more contexts more
+#     elegantly
+#
+# - Add further cacheing of more than the first word.
+#   Don't cache everything, but cache all operations that take
+#   more than a set time limit.
+
 def choose_context():
     print("Please select a Wordle version to use:")
     contexts = wordle_contexts.get_contexts()
@@ -62,7 +81,6 @@ def main():
     solution_group = wordle_solver.SolutionGroup(solutions)
 
     # Hard mode doesn't work yet, disable for now
-    # TODO support hard mode
     ## hard_mode = input("Hard Mode?: ").strip() == "y"
     hard_mode = False
 
