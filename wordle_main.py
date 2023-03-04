@@ -46,14 +46,16 @@ def main():
     context = choose_context()
     solutions, word_list = wordle_contexts.load_solutions_word_list(context)
 
-    if word_list == ALL_WORDS_TOKEN:
-        print(f"Loaded {26 ** WORD_LENGTH} words.")
-    else:
+    if word_list != ALL_WORDS_TOKEN:
         print(f"Loaded {len(word_list)} words.")
-
     print(f"Loaded {len(solutions)} possible solutions.")
 
-    naive = input("Naive Mode?: ").strip() == "y"
+    # There is no naive mode, if word list is all words
+    if word_list != ALL_WORDS_TOKEN:
+        naive = input("Naive Mode?: ").strip() == "y"
+    else:
+        naive = False
+
     if naive:
         solutions = word_list
 
