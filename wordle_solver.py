@@ -3,9 +3,10 @@ import itertools
 from abc import ABCMeta, abstractmethod
 
 import math
-from multiprocessing import Process, Queue, cpu_count
+import concurrent.futures
+from multiprocessing import cpu_count
 
-from wordle_utils import progress_bar, ProgressBarMP
+from wordle_utils import progress_bar, ProgressBarMP, wait_exception
 from wordle_contexts import LETTERS, WORD_LENGTH
 
 class BaseWordGroup(metaclass = ABCMeta):
@@ -351,7 +352,7 @@ class SolutionGroup(BaseSolutionGroup):
         for result in RESULTS:
             self._word_list.difference_update(processed_words)
             if not self:
-                # Force this to marked as changed
+                # Force this to be marked as changed
                 self.changed = True
                 self.reset()
                 break
@@ -389,7 +390,7 @@ class SolutionGroup(BaseSolutionGroup):
         # Foil is the result that keeps the most combinations
         return rank, foil
 
-    def _guess_rank_mp(self, guess_group, queue):
+    def _guess_rank_mp(self, guess_group):
         best_guesses = []
         best_rank = None
 
@@ -403,7 +404,7 @@ class SolutionGroup(BaseSolutionGroup):
             elif rank == best_rank:
                 best_guesses.append(word)
 
-        queue.put((best_guesses, best_rank))
+        return best_guesses, best_rank
 
 def best_guesses(guess_group, solution_group, progress = True, mp = True):
     # Find the best next word
@@ -430,39 +431,31 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
         if progress:
             print(f"Calculating Guesses using {mp} processes...")
 
-        processes = []
         chunksize = math.ceil(len(guess_group) / mp)
-        queue = Queue()
-        progress_bar_mp = ProgressBarMP(mp, persist = progress)
+        progress_bar_mp = ProgressBarMP(len(guess_group), persist = progress)
 
         # So we can directly index it
         guess_list = list(guess_group)
 
-        for i in range(mp):
-            process = Process(target = solution_group.copy()._guess_rank_mp,
-                args = (progress_bar_mp.worker_loop(guess_list[chunksize * i: chunksize * (i + 1)]),
-                        queue))
+        with concurrent.futures.ProcessPoolExecutor(mp) as executor:
+            fs = []
+            for i in range(mp):
+                future = executor.submit(solution_group._guess_rank_mp,
+                    progress_bar_mp.worker_loop(guess_list[chunksize * i: chunksize * (i + 1)]))
+                fs.append(future)
 
-            processes.append(process)
+            progress_bar_mp.parent_loop(lambda x: wait_exception(fs, x))
 
-        for process in processes:
-            process.start()
+            for future in fs:
+                guesses, rank = future.result()
 
-        progress_bar_mp.parent_loop()
+                if not best_rank or rank < best_rank:
+                    best_rank = rank
+                    best_guesses = guesses
 
-        for process in processes:
-            process.join()
+                elif rank == best_rank:
+                    best_guesses.extend(guesses)
 
-        # Collect results
-        while not queue.empty():
-            guesses, rank = queue.get()
-
-            if not best_rank or rank < best_rank:
-                best_rank = rank
-                best_guesses = guesses
-
-            elif rank == best_rank:
-                best_guesses.extend(guesses)
     else:
         # Use single process
         for word in progress_bar(guess_group, persist = progress):

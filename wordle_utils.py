@@ -5,8 +5,9 @@ time taken.
 import sys
 import time
 
+import concurrent.futures
 from functools import wraps
-from multiprocessing import RLock, Value
+from multiprocessing import Manager
 
 try:
     from colorama.ansi import clear_line
@@ -130,6 +131,14 @@ def duration_fmt(duration):
 
     return " ".join(parts)
 
+def wait_exception(fs, timeout = None):
+    """
+    Wait for the Future instances given by fs to return an exception.
+    Returns the Future instances that returned an exception.
+    """
+    done, not_done = concurrent.futures.wait(fs, timeout, concurrent.futures.FIRST_EXCEPTION)
+    return set(f for f in done if f.exception())
+
 class PickleGenerator:
     """
     Internal class to represent a wrapped generator.
@@ -159,11 +168,13 @@ def pickleable_generator(generator):
 class ProgressBarMP:
     """
     Show a progress bar for multiprocessing.
+    Meant to represent a progress bar for a number of items to be processed.
     """
-    def __init__(self, processes, ticks = 10, delay = 0.5,
-                persist = False, enabled = None, timer = time.perf_counter):
+    def __init__(self, length, ticks = 10, delay = 0.5,
+                persist = False, enabled = None, timer = time.perf_counter,
+                manager = None):
         """
-        processes: Number of processes that will be used.
+        length: Number of items that will be processed.
         ticks: Maximum number of updates per second.
         delay: Delay in seconds before showing the progress bar.
         persist: Should the progress bar be cleared at the end.
@@ -174,8 +185,8 @@ class ProgressBarMP:
         if enabled is None:
             enabled = sys.stdout.isatty()
 
-        self.processes_total = processes
-        self.ticks = ticks
+        self.length = length
+        self.tick_duration = 1 / ticks
         self.delay = delay
         self.persist = persist
         self.enabled = enabled
@@ -184,56 +195,46 @@ class ProgressBarMP:
         # The count of completed task needs to be kept.
         # But time remaining is actually a separate operation.
         # As the time remaining is the time of the longest taking task.
+        if manager is None:
+            manager = Manager()
 
         # Use an explicit lock so shared objects share a lock
-        lock = RLock()
-        self.count = Value("i", 0, lock = lock)
-        self.length = Value("i", 0, lock = lock)
-        self.processes_count = Value("i", 0, lock = lock)
+        # https://bugs.python.org/issue35786 !!!
+        self.lock = manager.Lock()
+        self.count_value = manager.Value("i", 0, lock = False)
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
     @pickleable_generator
-    def worker_loop(self, iterable, length = None):
+    def worker_loop(self, iterable):
         """
         Loop over iterable and update progress bar.
         iterable: The object to return items from.
-        length: The length of the iterable. If None, use len().
         """
         # If disabled, just return the values.
         if not self.enabled:
             yield from iterable
             return
 
-        # Register process
-        with self.processes_count.get_lock():
-            if self.processes_count.value >= self.processes_total:
-                # Too many processes
-                raise RuntimeError(
-                    f"{self.processes_total} have already been created.")
-
-            self.processes_count.value += 1
-
-        if length is None:
-            length = len(iterable)
         iterable = iter(iterable)
-
-        # Set length
-        with self.length.get_lock():
-            self.length.value += length
 
         # Start showing progress bar
         tick_start = self.timer()
-        tick_duration = 1 / self.ticks
 
         count = 0
         while True:
-            # Show progress
-            if self.timer() - tick_start > tick_duration:
+            # Update progress
+            if self.timer() - tick_start > self.tick_duration:
                 # Update the tick start
                 tick_start = self.timer()
 
                 # Update count
-                with self.count.get_lock():
-                    self.count.value += count
+                with self.lock:
+                    self.count_value.value += count
                 count = 0
 
             # Yield next value
@@ -245,63 +246,58 @@ class ProgressBarMP:
                 count += 1
 
         # Send final count
-        with self.count.get_lock():
-            self.count.value += count
+        with self.lock:
+            self.count_value.value += count
 
-    def parent_loop(self):
+    def parent_loop(self, wait_check):
         """
         Print progress bar and wait for completion.
+        NOTE: wait_check() must return True when loop should exit
+        Otherwise, a deadlock is possible is a subprocess is killed, and does not complete.
         """
         # If disabled, just exit
         if not self.enabled:
             return
 
+        if wait_check is None:
+            # NOTE: Can deadlock, you have been warned.
+            wait_check = time.sleep
+
         # Start timing
         start = self.timer()
 
         # Just wait for delay period to pass.
-        time.sleep(self.delay)
+        if wait_check(self.delay):
+            return
 
         # Start showing progress bar
-        tick_duration = 1 / self.ticks
         progress_shown = False
-
-        # Wait for all workers to start
-        while True:
-            with self.processes_count.get_lock():
-                if self.processes_count.value == self.processes_total:
-                    break
-
-                assert self.processes_count.value < self.processes_total, \
-                    f"{self.processes_count.value} processes have been created" \
-                    f" when only {self.processes_total} were expected."
-
-            time.sleep(tick_duration)
 
         while True:
             # Get count, length
-            count = self.count.value
-            length = self.length.value
+            count = self.count_value.value
 
             # Stop if complete
-            if count == length:
+            if count >= self.length:
                 break
 
             # Clear progress line
             if progress_shown: print(clear_line(), end = "")
 
             # Print the progress
-            print_progress(count, length, self.timer() - start)
+            print_progress(count, self.length, self.timer() - start)
             progress_shown = True
 
             # Wait for next tick
-            time.sleep(tick_duration)
+            if wait_check(self.delay):
+                count = self.count_value.value
+                break
 
         # Clear progress up until now
         if progress_shown: print(clear_line(), end = "")
 
         # Print final progress
-        print_progress(count, length, self.timer() - start)
+        print_progress(count, self.length, self.timer() - start)
 
         if self.persist:
             # Show progress bar permanently.
