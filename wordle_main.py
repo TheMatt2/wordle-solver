@@ -20,6 +20,12 @@ from wordle_contexts import ALL_WORDS_TOKEN, WORD_LENGTH
 # - Add further cacheing of more than the first word.
 #   Don't cache everything, but cache all operations that take
 #   more than a set time limit.
+#
+# - Improve progress bar
+#   - Update progress so the estimate is the time for the longest running
+#     process to finish.
+#   - Make sure that a crash in a worker thread doesn't cause the entire program to freeze
+#
 
 def choose_context():
     print("Please select a Wordle version to use:")
