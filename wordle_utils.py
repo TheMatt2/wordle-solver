@@ -131,13 +131,23 @@ def duration_fmt(duration):
 
     return " ".join(parts)
 
-def wait_exception(fs, timeout = None):
+def wait_exception_or_completed(fs, timeout = None):
     """
-    Wait for the Future instances given by fs to return an exception.
-    Returns the Future instances that returned an exception.
+    Wait for all futures to complete or one to raise an exception.
     """
-    done, not_done = concurrent.futures.wait(fs, timeout, concurrent.futures.FIRST_EXCEPTION)
-    return set(f for f in done if f.exception())
+    done, not_done = concurrent.futures.wait(
+        fs, timeout, concurrent.futures.FIRST_EXCEPTION)
+
+    for future in done:
+        if future.exception():
+            # Stop because exception was raised
+            return True
+
+    if not not_done:
+        # Stop because all futures are done
+        return True
+
+    return False
 
 class PickleGenerator:
     """
@@ -204,9 +214,16 @@ class ProgressBarMP:
         self.count_value = manager.Value("i", 0, lock = False)
 
     def __enter__(self):
-        pass
+        return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Close the progress bar.
+        """
+        if exc_type is not None:
+            # Let exception propagate
+            return False
+
         self.close()
 
     @pickleable_generator
@@ -272,36 +289,50 @@ class ProgressBarMP:
 
         # Start showing progress bar
         progress_shown = False
+        try:
+            while True:
+                # Get count, length
+                count = self.count_value.value
 
-        while True:
-            # Get count, length
-            count = self.count_value.value
+                # Stop if complete
+                if count >= self.length:
+                    break
 
-            # Stop if complete
-            if count >= self.length:
-                break
+                # Clear progress line
+                if progress_shown: print(clear_line(), end = "")
 
-            # Clear progress line
+                # Print the progress
+                print_progress(count, self.length, self.timer() - start)
+                progress_shown = True
+
+                # Wait for next tick
+                if wait_check(self.delay):
+                    count = self.count_value.value
+                    break
+        finally:
+            # Clear progress up until now
             if progress_shown: print(clear_line(), end = "")
 
-            # Print the progress
+            # Print final progress
             print_progress(count, self.length, self.timer() - start)
-            progress_shown = True
 
-            # Wait for next tick
-            if wait_check(self.delay):
-                count = self.count_value.value
-                break
+            if self.persist:
+                # Show progress bar permanently.
+                print()
+            else:
+                # Use format code to clear progress bar
+                print(clear_line(), end = "")
 
-        # Clear progress up until now
-        if progress_shown: print(clear_line(), end = "")
+    def is_finished(self):
+        """
+        Check if progress bar is finished.
+        """
+        return self.count_value.value >= self.length
 
-        # Print final progress
-        print_progress(count, self.length, self.timer() - start)
-
-        if self.persist:
-            # Show progress bar permanently.
-            print()
-        else:
-            # Use format code to clear progress bar
-            print(clear_line(), end = "")
+    def close(self):
+        """
+        Close the progress bar. Verifies progress is complete."""
+        if self.count_value.value != self.length:
+            # Exited cleanly, but not complete
+            raise RuntimeError("Progress bar finished early at "
+                               f"{self.count_value.value} / {self.length}")

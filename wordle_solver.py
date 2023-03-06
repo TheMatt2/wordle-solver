@@ -6,8 +6,8 @@ import math
 import concurrent.futures
 from multiprocessing import cpu_count
 
-from wordle_utils import progress_bar, ProgressBarMP, wait_exception
 from wordle_contexts import LETTERS, WORD_LENGTH
+from wordle_utils import progress_bar, ProgressBarMP, wait_exception_or_completed
 
 class BaseWordGroup(metaclass = ABCMeta):
     """
@@ -432,19 +432,20 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
             print(f"Calculating Guesses using {mp} processes...")
 
         chunksize = math.ceil(len(guess_group) / mp)
-        progress_bar_mp = ProgressBarMP(len(guess_group), persist = progress)
 
         # So we can directly index it
         guess_list = list(guess_group)
 
-        with concurrent.futures.ProcessPoolExecutor(mp) as executor:
+        with (
+            ProgressBarMP(len(guess_group), persist = progress) as progress_bar_mp,
+            concurrent.futures.ProcessPoolExecutor(mp) as executor):
             fs = []
             for i in range(mp):
                 future = executor.submit(solution_group._guess_rank_mp,
                     progress_bar_mp.worker_loop(guess_list[chunksize * i: chunksize * (i + 1)]))
                 fs.append(future)
 
-            progress_bar_mp.parent_loop(lambda x: wait_exception(fs, x))
+            progress_bar_mp.parent_loop(lambda x: wait_exception_or_completed(fs, x))
 
             for future in fs:
                 guesses, rank = future.result()
