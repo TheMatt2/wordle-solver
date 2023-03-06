@@ -15,7 +15,8 @@ except NameError:
     clear_line = lambda: None
 
 def progress_bar(iterable, ticks = 10, delay = 0.5,
-                persist = False, enabled = None, timer = time.perf_counter):
+                persist = False, enabled = None,
+                file = None, timer = time.perf_counter):
     """
     Show a simply progress bar for iterable.
     iterable: The object to return items from.
@@ -24,10 +25,14 @@ def progress_bar(iterable, ticks = 10, delay = 0.5,
     persist: Should the progress bar be cleared at the end.
     enabled: If false, disable the progress bar.
         If None, enable if output is tty.
+    file: File like object to write progress bar to. stderr by default
     timer: Function to use for time.
     """
+    if file is None:
+        file = sys.stderr
+
     if enabled is None:
-        enabled = sys.stdout.isatty()
+        enabled = file.isatty()
 
     if not enabled:
         # Just return the values.
@@ -61,10 +66,10 @@ def progress_bar(iterable, ticks = 10, delay = 0.5,
             tick_start = timer()
 
             # Clear progress up until now
-            if progress_shown: print(clear_line(), end = "")
+            if progress_shown: file.write(clear_line())
 
             # Print the progress
-            print_progress(count, length, timer() - start)
+            print_progress(count, length, timer() - start, file = file)
             progress_shown = True
 
         # Yield next value
@@ -76,21 +81,25 @@ def progress_bar(iterable, ticks = 10, delay = 0.5,
             count += 1
 
     # Clear progress up until now
-    if progress_shown:
-        print(clear_line(), end = "")
+    if progress_shown: file.write(clear_line())
 
     # Print final progress
-    print_progress(count, length, timer() - start)
+    print_progress(count, length, timer() - start, file = file)
 
     if persist:
         # Show progress bar permanently.
-        print()
+        file.write("\n")
     else:
         # Use format code to clear progress bar
-        print(clear_line(), end = "")
+        file.write(clear_line())
 
-def print_progress(count, length, duration):
+    file.flush()
+
+def print_progress(count, length, duration, file = None):
     """Format progress bar"""
+    if file is None:
+        file = sys.stderr
+
     if length:
         percent = f"{count * 100 / length:.2f}%"
     else:
@@ -104,8 +113,10 @@ def print_progress(count, length, duration):
     else:
         projected = "-- secs"
 
-    print(f"Progress: {percent} ({ratio}) Elapsed: {elapsed} "
-          f"Remaining: {projected}", end = "\r")
+    file.write(
+        f"Progress: {percent} ({ratio}) Elapsed: {elapsed} "
+        f"Remaining: {projected}\r")
+    file.flush()
 
 SECONDS_PER_MINUTE = 60.
 SECONDS_PER_HOUR = 60. * 60
@@ -149,95 +160,28 @@ def wait_exception_or_completed(fs, timeout = None):
 
     return False
 
-class PickleGenerator:
-    """
-    Internal class to represent a wrapped generator.
-    """
-    def __init__(self, generator, *args, **kwargs):
-        self.generator = generator
-        self.args = args
-        self.kwargs = kwargs
-
-    def __iter__(self):
-        return iter(self.generator(*self.args, **self.kwargs))
-
-def pickleable_generator(generator):
-    """
-    Allow pickling of generators. While it is not possible to truly
-    pickle a generator, this gets around the issue by not creating
-    the generator, and just saving the arguments.
-    """
-    @wraps(generator)
-    def wrapper(*args, **kwargs):
-        return PickleGenerator(generator, *args, **kwargs)
-
-    # Update qualified name so pickling works correctly
-    generator.__qualname__ += ".__wrapped__"
-    return wrapper
-
-class ProgressBarMP:
-    """
-    Show a progress bar for multiprocessing.
-    Meant to represent a progress bar for a number of items to be processed.
-    """
-    def __init__(self, length, ticks = 10, delay = 0.5,
-                persist = False, enabled = None, timer = time.perf_counter,
-                manager = None):
+class ProgressWorker:
+    def __init__(self, iterable, tick_duration, lock, count_value, timer = time.perf_counter):
         """
-        length: Number of items that will be processed.
-        ticks: Maximum number of updates per second.
-        delay: Delay in seconds before showing the progress bar.
-        persist: Should the progress bar be cleared at the end.
-        enabled: If false, disable the progress bar.
-            If None, enable if output is tty.
-        timer: Function to use for time.
+        Show a progress bar for iterable.
+        iterable: The object to return items from.
+        tick_duration: Pause in seconds between each update.
+        lock: Lock to use for updating count.
+        count_value: Value to update with count.
+        timer: Time function to use.
         """
-        if enabled is None:
-            enabled = sys.stdout.isatty()
-
-        self.length = length
-        self.tick_duration = 1 / ticks
-        self.delay = delay
-        self.persist = persist
-        self.enabled = enabled
+        self.iterable = iterable
+        self.tick_duration = tick_duration
+        self.lock = lock
+        self.count_value = count_value
         self.timer = timer
 
-        # The count of completed task needs to be kept.
-        # But time remaining is actually a separate operation.
-        # As the time remaining is the time of the longest taking task.
-        if manager is None:
-            manager = Manager()
-
-        # Use an explicit lock so shared objects share a lock
-        # https://bugs.python.org/issue35786 !!!
-        self.lock = manager.Lock()
-        self.count_value = manager.Value("i", 0, lock = False)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        """
-        Close the progress bar.
-        """
-        if exc_type is not None:
-            # Let exception propagate
-            return False
-
-        self.close()
-
-    @pickleable_generator
-    def worker_loop(self, iterable):
+    def __iter__(self):
         """
         Loop over iterable and update progress bar.
         iterable: The object to return items from.
         """
-        # If disabled, just return the values.
-        if not self.enabled:
-            yield from iterable
-            return
-
-        iterable = iter(iterable)
+        iterable = iter(self.iterable)
 
         # Start showing progress bar
         tick_start = self.timer()
@@ -265,6 +209,75 @@ class ProgressBarMP:
         # Send final count
         with self.lock:
             self.count_value.value += count
+
+class ProgressBarMP:
+    """
+    Show a progress bar for multiprocessing.
+    Meant to represent a progress bar for a number of items to be processed.
+    """
+    def __init__(self, length, ticks = 10, delay = 0.5,
+                persist = False, enabled = None, file = None,
+                timer = time.perf_counter, manager = None):
+        """
+        length: Number of items that will be processed.
+        ticks: Maximum number of updates per second.
+        delay: Delay in seconds before showing the progress bar.
+        persist: Should the progress bar be cleared at the end.
+        enabled: If false, disable the progress bar.
+            If None, enable if output is tty.
+        file: File like object to write progress bar to. stderr by default
+        timer: Function to use for time.
+        manager: Multiprocessing manager to create synchronization objects.
+        """
+        if file is None:
+            file = sys.stderr
+
+        if enabled is None:
+            enabled = file.isatty()
+
+        self.length = length
+        self.tick_duration = 1 / ticks
+        self.delay = delay
+        self.persist = persist
+        self.enabled = enabled
+        self.file = file
+        self.timer = timer
+
+        # The count of completed task needs to be kept.
+        # But time remaining is actually a separate operation.
+        # As the time remaining is the time of the longest taking task.
+        if manager is None:
+            manager = Manager()
+
+        # Use an explicit lock so shared objects share a lock
+        # https://bugs.python.org/issue35786 !!!
+        self.lock = manager.Lock()
+        self.count_value = manager.Value("i", 0, lock = False)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Close the progress bar.
+        """
+        if exc_type is not None:
+            # Let exception propagate
+            return False
+
+        self.close()
+
+    def worker_loop(self, iterable):
+        """
+        Loop over iterable and update progress bar.
+        iterable: The object to return items from.
+        """
+        # If disabled, just return the values.
+        if not self.enabled:
+            return iterable
+
+        # Otherwise create and return ProgressWorker
+        return ProgressWorker(iterable, self.tick_duration, self.lock, self.count_value, self.timer)
 
     def parent_loop(self, wait_check):
         """
@@ -299,10 +312,10 @@ class ProgressBarMP:
                     break
 
                 # Clear progress line
-                if progress_shown: print(clear_line(), end = "")
+                if progress_shown: self.file.write(clear_line())
 
                 # Print the progress
-                print_progress(count, self.length, self.timer() - start)
+                print_progress(count, self.length, self.timer() - start, file = self.file)
                 progress_shown = True
 
                 # Wait for next tick
@@ -311,17 +324,18 @@ class ProgressBarMP:
                     break
         finally:
             # Clear progress up until now
-            if progress_shown: print(clear_line(), end = "")
+            if progress_shown: self.file.write(clear_line())
 
             # Print final progress
-            print_progress(count, self.length, self.timer() - start)
+            print_progress(count, self.length, self.timer() - start, file = self.file)
 
             if self.persist:
                 # Show progress bar permanently.
-                print()
+                self.file.write("\n")
             else:
                 # Use format code to clear progress bar
-                print(clear_line(), end = "")
+                self.file.write(clear_line())
+            self.file.flush()
 
     def is_finished(self):
         """
