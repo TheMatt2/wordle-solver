@@ -112,35 +112,47 @@ def main():
         while True:
             word = input("Word: ").strip()
 
-            if len(word) == WORD_LENGTH and word_list == ALL_WORDS_TOKEN:
-                # Skip word list check
-                break
+            if len(word) != WORD_LENGTH:
+                print(f"{word!r} is not {WORD_LENGTH} letters. Please enter word again.")
+                continue
 
-            if word in word_list:
-                # Valid, exit
-                break
+            if word_list != ALL_WORDS_TOKEN and word not in word_list:
+                if input(
+                    f"{word!r} is not in the word list. Use this word anyway? (y/n): "
+                    ).strip() == "y":
+                    break
+                else:
+                    continue
 
-            if input(
-                f"{word!r} is not in the word list. Use this word anyway? (y/n): "
-                ).strip() == "y":
-                break
+            # Otherwise, continue normally
+            break
 
         while True:
             result = input("Result: ").strip()
-            if is_result(result):
-                # Valid, exit
-                break
 
-            print(f"{result!r} is not a valid result. Please enter result again.")
+            # Make sure result format is right
+            if not is_result(result):
+                print(f"{result!r} is not a valid result. Please enter result again.")
+                continue
+
+            # Make sure result is possible
+            if not wordle_solver.result_possible(word, result):
+                print(f"{result!r} is not possible for {word!r}. Please enter result again.")
+                continue
+
+            # Otherwise, continue normally
+            break
 
         if result == "ggggg":
             print("Success!")
             break
 
         # Find number of words remaining
+        solution_count_old = len(solution_group)
         solution_group.filter_solutions(word, result)
+        solution_count = len(solution_group)
 
-        print("Words Remaining:", len(solution_group))
+        print("Words Remaining:", solution_count)
         print_first(solution_group)
 
         if len(solution_group) == 2:
@@ -163,10 +175,13 @@ def main():
             print("There are no possible remaining solutions.")
             break
 
-        init_guesses, rank = wordle_solver.best_guesses(guess_group, solution_group)
-        init_guesses.sort()
-        print_first(init_guesses)
-        word = init_guesses[0]
+        if solution_count_old != solution_count:
+            # No solutions removed, no need to recalculate guesses
+            init_guesses, rank = wordle_solver.best_guesses(guess_group, solution_group)
+            init_guesses.sort()
+            print_first(init_guesses)
+            word = init_guesses[0]
+
         print("Best Next Guess:", word)
 
 if __name__ == "__main__":
