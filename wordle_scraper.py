@@ -133,7 +133,12 @@ def scrap_wordplay():
     # March 2023, as both Wordplay and NYT are the only known Wordles
     # that accept "seria" as a word, it is assumed wordplay shares
     # word list and solutions with NYT
-    return scrap_nytimes()
+    # Update: "olate" is not considered a valid word.
+    #    Which is consistant with the old NYT word list.
+    #    There are no known word list that include "seria" but exclude "olate"
+    #    Yet "tangy" is a solution.
+    #    This seems to indicate the exact word list is different than any known.
+    return scrap_wordlewebsite_daily()
 
 WORDLEWEBSITE_DAILY_URL = "https://wordlewebsite.com/game/daily-wordle/rs/js/d_wordle.js"
 
