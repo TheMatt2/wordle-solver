@@ -102,11 +102,11 @@ def main():
 
     init_guesses.sort()
     print_first(init_guesses)
-    word = init_guesses[0]
-    print(f"Best starting word: {word}")
-    rank, foil = solution_group.guess_rank(word)
-    print(f"rank: {rank} worst case: {foil}")
+    best_guess = init_guesses[0]
+    print(f"Best starting word: {best_guess}")
     print("Words Remaining:", len(solution_group))
+    rank, foil = solution_group.guess_rank(best_guess)
+    print(f"rank: {rank} worst case: {foil}")
 
     while True:
         while True:
@@ -159,15 +159,15 @@ def main():
             # Only two or less words
             # Best solution is to guess one of the words
             words = sorted(solution_group)
-            word = words[0]
+            best_guess = words[0]
             print("Best Next Guess:", words[0])
             print("Failing Guess:", words[1])
             continue
 
         if len(solution_group) == 1:
             # Only one solution
-            word = next(iter(solution_group))
-            print("Best Next Guess:", word)
+            best_guess = next(iter(solution_group))
+            print("Best Next Guess:", best_guess)
             break
 
         if len(solution_group) == 0:
@@ -176,13 +176,19 @@ def main():
             break
 
         if solution_count_old != solution_count:
-            # No solutions removed, no need to recalculate guesses
+            # No solutions removed
             init_guesses, rank = wordle_solver.best_guesses(guess_group, solution_group)
             init_guesses.sort()
             print_first(init_guesses)
-            word = init_guesses[0]
+            best_guess = init_guesses[0]
+        else:
+            # Still recalculate guesses
+            wordle_solver.filter_guesses(guess_group, solution_group)
 
-        print("Best Next Guess:", word)
+        # Print best guess, or the prior guess, if word did not restrict solutions
+        print("Best Next Guess:", best_guess)
+        rank, foil = solution_group.guess_rank(best_guess)
+        print(f"rank: {rank} worst case: {foil}")
 
 if __name__ == "__main__":
     main()

@@ -406,11 +406,11 @@ class SolutionGroup(BaseSolutionGroup):
 
         return best_guesses, best_rank
 
-def best_guesses(guess_group, solution_group, progress = True, mp = True):
-    # Find the best next word
-    best_guesses = []
-    best_rank = None
-
+def filter_guesses(guess_group, solution_group, progress = True):
+    """
+    Remove guesses that are strictly worse than other guess words
+    That way we don't need to spend time checking them as solutions
+    """
     # Do not consider words that use letters that are already excluded
     start = time.perf_counter()
     full_word_list_count = len(guess_group)
@@ -419,13 +419,22 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
     stop = time.perf_counter()
 
     # Say how many words were filtered out, if there are excluded letters
-    if progress and excluded_letters:
+    if progress and full_word_list_count != len(guess_group):
         print(f"Filtered {full_word_list_count} words down to "
             f"{len(guess_group)} in {stop - start:.4f} secs")
+
+def best_guesses(guess_group, solution_group, progress = True, mp = True):
+    # Find the best next word
+    best_guesses = []
+    best_rank = None
+
+    # Remove extra guesses
+    filter_guesses(guess_group, solution_group, progress)
 
     if mp is True:
         mp = cpu_count()
 
+    start = time.perf_counter()
     if mp:
         # Use multiprocessing to accelerate processing
         if progress:
