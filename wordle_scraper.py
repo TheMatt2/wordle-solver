@@ -128,6 +128,13 @@ def scrap_wordlegame():
     word_list = list(set(word_list))
     return solutions, word_list
 
+def scrap_wordplay():
+    # Wordplay does not actually expose the word list, or solutions
+    # March 2023, as both Wordplay and NYT are the only known Wordles
+    # that accept "seria" as a word, it is assumed wordplay shares
+    # word list and solutions with NYT
+    return scrap_nytimes()
+
 WORDLEWEBSITE_DAILY_URL = "https://wordlewebsite.com/game/daily-wordle/rs/js/d_wordle.js"
 
 # Known values of wordlists to find them in html / javascript

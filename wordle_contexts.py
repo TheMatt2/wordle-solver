@@ -12,12 +12,13 @@ ALL_WORDS_TOKEN = "ALL_WORDS_ARE_VALID_GUESSES"
 import wordle_scraper
 
 WORDLE_CONTEXTS = [
-    "new_york_times", "wordlegame_org", "wordlewebsite_com_daily",
+    "new_york_times", "wordlegame_org", "wordplay_com", "wordlewebsite_com_daily",
     "wordlewebsite_com_unlimited", "flappy_birdle"]
 
 WORDLE_CONTEXTS_COMMON_NAME = {
     "new_york_times": "New York Times Wordle",
     "wordlegame_org": "wordlegame.org Wordle",
+    "wordplay_com": "wordplay.com Wordle",
     "wordlewebsite_com_daily": "wordlewebsite.com Wordle (Daily)",
     "wordlewebsite_com_unlimited": 'wordlewebsite.com Wordle ("Unlimited")',
     "flappy_birdle": "Flappy Birdle"}
@@ -25,6 +26,7 @@ WORDLE_CONTEXTS_COMMON_NAME = {
 WORDLE_CONTEXTS_SCRAPER = {
     "new_york_times": wordle_scraper.scrap_nytimes,
     "wordlegame_org": wordle_scraper.scrap_wordlegame,
+    "wordplay_com": wordle_scraper.scrap_wordplay,
     "wordlewebsite_com_daily": wordle_scraper.scrap_wordlewebsite_daily,
     "wordlewebsite_com_unlimited": wordle_scraper.scrap_wordlewebsite_unlimited,
     "flappy_birdle": wordle_scraper.scrap_flappy_birdle}
