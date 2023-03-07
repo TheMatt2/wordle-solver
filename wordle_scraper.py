@@ -14,6 +14,35 @@ import urllib.parse
 
 from wordle_contexts import ALL_WORDS_TOKEN, LETTERS, WORD_LENGTH
 
+def check_solutions_word_lists(solutions, word_list):
+    # Verify solution and word lists make sense
+    if word_list != ALL_WORDS_TOKEN:
+        words = itertools.chain(solutions, word_list)
+    else:
+        # Don't bother checking word list
+        words = solutions
+
+    for word in words:
+        if len(word) != WORD_LENGTH:
+            raise ValueError(f"{word!r} is not {WORD_LENGTH} letters: ")
+
+        for c in word:
+            if c not in LETTERS:
+                raise ValueError(f"{word!r} has illegal letter {c!r}")
+
+    # There should be no duplicates
+    solutions_set = set(solutions)
+    if len(solutions) != len(solutions_set):
+        raise ValueError("Solutions contains duplicate words")
+
+    if word_list != ALL_WORDS_TOKEN:
+        word_list_set = set(word_list)
+        if len(word_list) != len(word_list_set):
+            raise ValueError("Word list contains duplicate words")
+
+        if not word_list_set.issuperset(solutions_set):
+            raise ValueError("Not all solutions are in word list")
+
 NYTIMES_WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
 NYTIMES_WORDLE_JS_CRIB = 'src="https://www.nytimes.com/games-assets/v2/wordle.'
 
@@ -70,6 +99,7 @@ def scrap_nytimes():
 
 WORDLEGAME_WORD_LIST_URL = "https://wordlegame.org/files/wordle/en/dictionary.json" # September 2022, v39.67
 WORDLEGAME_SOLUTIONS_URL = "https://wordlegame.org/files/wordle/en/targets.json" # September 2022, v39.67
+# WORDLEGAME_SOLUTIONS_CRIB = '"cigar","rebut","sissy",' # February, 2023, Solutions are present, but not the start of the array
 
 def scrap_wordlegame():
     # wordlegame.org separates solutions and word lists into json, so they are
@@ -98,34 +128,75 @@ def scrap_wordlegame():
     word_list = list(set(word_list))
     return solutions, word_list
 
-def check_solutions_word_lists(solutions, word_list):
-    # Verify solution and word lists make sense
-    if word_list != ALL_WORDS_TOKEN:
-        words = itertools.chain(solutions, word_list)
-    else:
-        # Don't bother checking word list
-        words = solutions
+WORDLEWEBSITE_DAILY_URL = "https://wordlewebsite.com/game/daily-wordle/rs/js/d_wordle.js"
 
-    for word in words:
-        if len(word) != WORD_LENGTH:
-            raise ValueError(f"{word!r} is not {WORD_LENGTH} letters: ")
+# Known values of wordlists to find them in html / javascript
+WORDLEWEBSITE_DAILY_SOLUTIONS_CRIB = '["cigar", "rebut", "sissy",'
+WORDLEWEBSITE_DAILY_WORD_LIST_CRIB = '["aahed", "aalii", "aargh",'
 
-        for c in word:
-            if c not in LETTERS:
-                raise ValueError(f"{word!r} has illegal letter {c!r}")
+def scrap_wordlewebsite_daily():
+    # Grab wordle javascript
+    wordle_js = requests.get(WORDLEWEBSITE_DAILY_URL).text
 
-    # There should be no duplicates
-    solutions_set = set(solutions)
-    if len(solutions) != len(solutions_set):
-        raise ValueError("Solutions contains duplicate words")
+    # Remove lines with javascript comments
+    # Source contains a commented out list of original wordle list
+    wordle_js = "\n".join([line for line in wordle_js.split("\n")
+        if "//" not in line and "/*" not in line and "*/" not in line])
 
-    if word_list != ALL_WORDS_TOKEN:
-        word_list_set = set(word_list)
-        if len(word_list) != len(word_list_set):
-            raise ValueError("Word list contains duplicate words")
+    # Go to crib
+    solutions_start = wordle_js.index(WORDLEWEBSITE_DAILY_SOLUTIONS_CRIB)
+    solutions_stop = wordle_js.index("]", solutions_start) + 1
 
-        if not word_list_set.issuperset(solutions_set):
-            raise ValueError("Not all solutions are in word list")
+    solutions_raw = wordle_js[solutions_start:solutions_stop]
+
+    # If list does not begin with a bracket, add it
+    if solutions_raw[0] != "[":
+        solutions_raw = "[" + solutions_raw
+
+    solutions = json.loads(solutions_raw)
+
+    # Get word list
+    word_list_start = wordle_js.index(WORDLEWEBSITE_DAILY_WORD_LIST_CRIB)
+    word_list_stop = wordle_js.index("]", word_list_start) + 1
+
+    word_list_raw = wordle_js[word_list_start:word_list_stop]
+    word_list = json.loads(word_list_raw)
+
+    # word list does not include any of the solutions
+    word_list = word_list + solutions
+    return solutions, word_list
+
+# Because Wordle Website seems to use a NYT codebase for the daily, and Wordlegame.org for the "unlimited"
+WORDLEWEBSITE_UNLIMITED_WORD_LIST_URL = "https://wordlewebsite.com/game/hurdleunlimited/files/wordle/en/dictionary.json" # March 2023
+WORDLEWEBSITE_UNLIMITED_SOLUTIONS_URL = "https://wordlewebsite.com/game/hurdleunlimited/files/wordle/en/targets.json" # March 2023
+# WORDLEWEBSITE_UNLIMITED_SOLUTIONS_CRIB = '"aardvark", "abacus", "abbey"' # March 2023
+
+def scrap_wordlewebsite_unlimited():
+    # wordlegame.org separates solutions and word lists into json, so they are
+    # much easier to parse
+
+    # wordlegame.org's solutions and word lists contain values for other than
+    # 5 letters. This is because wordlegame.org supports variants for other
+    # word sizes. This currently only supports 5 letters, so remove the other words
+
+    # Despite marked with utf-8 encoding, wordlegame.org seems
+    # to *sometimes* actually encoded utf-8-sig
+    r = requests.get(WORDLEWEBSITE_UNLIMITED_SOLUTIONS_URL)
+    r.encoding = r.apparent_encoding
+    solutions = r.json()
+    solutions = [word for word in solutions if len(word) == 5]
+
+    # Despite marked with utf-8 encoding, wordlegame.org seems
+    # to *sometimes* actually encoded utf-8-sig
+    r = requests.get(WORDLEWEBSITE_UNLIMITED_WORD_LIST_URL)
+    r.encoding = r.apparent_encoding
+    word_list = r.json()
+    word_list = [word for word in word_list if len(word) == 5]
+
+    # Known duplicates that need to be removed
+    solutions = list(set(solutions))
+    word_list = list(set(word_list))
+    return solutions, word_list
 
 FLAPPY_BIRDLE_URL = "https://flappybirdle.com"
 FLAPPY_BIRDLE_JS_CRIB = 'src="/static/js/main.'
