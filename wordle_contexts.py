@@ -13,7 +13,7 @@ import wordle_scraper
 
 WORDLE_CONTEXTS = [
     "new_york_times", "wordlegame_org", "wordplay_com", "wordlewebsite_com_daily",
-    "wordlewebsite_com_unlimited", "flappy_birdle"]
+    "wordlewebsite_com_unlimited", "absurdle", "flappy_birdle"]
 
 WORDLE_CONTEXTS_COMMON_NAME = {
     "new_york_times": "New York Times Wordle",
@@ -21,7 +21,8 @@ WORDLE_CONTEXTS_COMMON_NAME = {
     "wordplay_com": "wordplay.com Wordle",
     "wordlewebsite_com_daily": "wordlewebsite.com Wordle (Daily)",
     "wordlewebsite_com_unlimited": 'wordlewebsite.com Wordle ("Unlimited")',
-    "flappy_birdle": "Flappy Birdle"}
+    "absurdle": "Absurdle (https://qntm.org/files/absurdle/absurdle.html)",
+    "flappy_birdle": "Flappy Birdle (https://flappybirdle.com)"}
 
 WORDLE_CONTEXTS_SCRAPER = {
     "new_york_times": wordle_scraper.scrap_nytimes,
@@ -29,6 +30,7 @@ WORDLE_CONTEXTS_SCRAPER = {
     "wordplay_com": wordle_scraper.scrap_wordplay,
     "wordlewebsite_com_daily": wordle_scraper.scrap_wordlewebsite_daily,
     "wordlewebsite_com_unlimited": wordle_scraper.scrap_wordlewebsite_unlimited,
+    "absurdle": wordle_scraper.scrap_absurdle,
     "flappy_birdle": wordle_scraper.scrap_flappy_birdle}
 
 WORDLE_CACHE = "cache"

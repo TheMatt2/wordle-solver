@@ -8,6 +8,7 @@ Two Wordle Games are currently supported:
  - https://www.nytimes.com/games/wordle
 """
 import json
+import hjson
 import requests
 import itertools
 import urllib.parse
@@ -208,6 +209,77 @@ def scrap_wordlewebsite_unlimited():
     # Known duplicates that need to be removed
     solutions = list(set(solutions))
     word_list = list(set(word_list))
+    return solutions, word_list
+
+ABSURDLE_URL = "https://qntm.org/files/absurdle/absurdle.html"
+ABSURDLE_JS_CRIB = 'src="main.'
+
+# Known values of wordlists to find them in html / javascript
+ABSURDLE_SOLUTIONS_CRIB = 'N=R({CI:"GARVI'
+ABSURDLE_WORD_LIST_CRIB = 'I=R({AA:"HEDLI'
+
+def scrap_absurdle():
+    wordle_page = requests.get(ABSURDLE_URL).text
+
+    # Go to crib
+    js_crib_index = wordle_page.index(ABSURDLE_JS_CRIB)
+    # Jump to start of url
+    js_url_start = wordle_page.index('"', js_crib_index) + 1
+    # Get url end
+    js_url_stop = wordle_page.index('"', js_url_start)
+
+    # Extract javascript file
+    js_url = wordle_page[js_url_start:js_url_stop]
+    assert js_url.endswith(".js"), "failed to extract Absurdle javascript URL"
+
+    js_url = urllib.parse.urljoin(ABSURDLE_URL, js_url)
+
+    # Grab wordle javascript
+    wordle_js = requests.get(js_url).text
+
+    # Go to crib
+    word_list_crib_index = wordle_js.index(ABSURDLE_WORD_LIST_CRIB)
+    # Find start of JSON object
+    js_url_start = wordle_js.index('{', word_list_crib_index)
+    # Get url end
+    js_url_stop = wordle_js.index('}', js_url_start)
+
+    # Extract word list as json object
+    word_list_raw = wordle_js[js_url_start:js_url_stop + 1]
+    word_list_json = hjson.loads(word_list_raw)
+
+    word_list = []
+    for prefix, remaining in word_list_json.items():
+        for i in range(0, len(remaining), 5 - len(prefix)):
+            suffix = remaining[i:i + 5 - len(prefix)]
+            word_list.append((prefix + suffix).lower())
+
+    # Get solutions
+
+    # Go to crib
+    solutions_crib_index = wordle_js.index(ABSURDLE_SOLUTIONS_CRIB)
+    # Find start of JSON object
+    js_url_start = wordle_js.index('{', solutions_crib_index)
+    # Get url end
+    js_url_stop = wordle_js.index('}', js_url_start)
+
+    # Extract word list as json object
+    solutions_raw = wordle_js[js_url_start:js_url_stop + 1]
+    solutions_json = hjson.loads(solutions_raw)
+
+    solutions = []
+    for prefix, remaining in solutions_json.items():
+        for i in range(0, len(remaining), 5 - len(prefix)):
+            suffix = remaining[i:i + 5 - len(prefix)]
+            solutions.append((prefix + suffix).lower())
+
+    # Add solutions to word list
+    word_list = word_list + solutions
+
+    # Remove duplicates
+    solutions = list(set(solutions))
+    word_list = list(set(word_list))
+
     return solutions, word_list
 
 FLAPPY_BIRDLE_URL = "https://flappybirdle.com"
