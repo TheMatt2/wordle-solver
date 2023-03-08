@@ -177,13 +177,12 @@ def main():
 
         if solution_count_old != solution_count:
             # No solutions removed
+            # There is no need to recalculate guesses, because guesses are
+            # updated based on the solution group. Solution group has not changed.
             init_guesses, rank = wordle_solver.best_guesses(guess_group, solution_group)
             init_guesses.sort()
             print_first(init_guesses)
             best_guess = init_guesses[0]
-        else:
-            # Still recalculate guesses
-            wordle_solver.filter_guesses(guess_group, solution_group)
 
         # Print best guess, or the prior guess, if word did not restrict solutions
         print("Best Next Guess:", best_guess)
