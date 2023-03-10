@@ -76,8 +76,11 @@ class WordGroup(BaseWordGroup):
     def __iter__(self):
         return iter(self._word_list)
 
-    def __repr__(self):
-        return f"<WordStats with {len(self)} words>"
+    def __getstate__(self):
+        # For pickling
+        # Do not save stats, as they are useless if changed
+        # Even if not changed, it is still likely faster to recalculate
+        return {"_word_list": self._word_list, "_changed": True}
 
     def copy(self):
         return self.__class__(self)
