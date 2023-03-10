@@ -42,11 +42,21 @@ class WordGroup(BaseWordGroup):
     to the previous state if a guess is wrong using reset().
     """
     def __init__(self, word_list):
-        # Save word list
-        self._word_list = set(word_list)
+        # Optimized initialzer if making a copy
+        if isinstance(word_list, WordGroup):
+            self._word_list = word_list._word_list.copy()
 
-        # Calculate stats for words
-        self.prepare_stats()
+            # As stats are only ever used immutably, just add without copy
+            self._word_breakdown = word_list._word_breakdown
+            self._word_contains = word_list._word_contains
+            self._letter_count = word_list._letter_count
+
+        else:
+            # Save word list
+            self._word_list = set(word_list)
+
+            # Calculate stats for words
+            self.prepare_stats()
 
     def __len__(self):
         return len(self._word_list)
@@ -64,7 +74,7 @@ class WordGroup(BaseWordGroup):
         return f"<WordStats with {len(self)} words>"
 
     def copy(self):
-        return self.__class__(self._word_list)
+        return self.__class__(self)
 
     def prepare_stats(self):
         """Calculate statistics for the current word list"""
@@ -215,11 +225,17 @@ class BaseSolutionGroup(WordGroup):
     Keep an internal reset state for repeated filtering.
     """
     def __init__(self, word_list):
-        super().__init__(word_list)
+        if isinstance(word_list, BaseSolutionGroup):
+            # Optimized copy initializer
+            super().__init__(word_list)
+            self.changed = word_list.changed
+        else:
+            # Setup internal state, initially true so stats are prepared
+            self.changed = True
+            super().__init__(word_list)
 
-        # Setup internal state
-        self._prev_word_list = self._word_list.copy()
-        self.changed = False
+            # Make sure group is not marked change anymore
+            assert not self.changed
 
     @abstractmethod
     def filter_solutions(self, word, result):
@@ -233,12 +249,16 @@ class BaseSolutionGroup(WordGroup):
         """
         pass
 
-    def reset(self):
-        if self.changed:
-            assert self._prev_word_list is not None, \
-                "Reset state has never been set, yet word list is changed"
-            self._word_list = self._prev_word_list.copy()
-            self.changed = False
+    def prepare_stats(self):
+        """Calculate statistics for the current word list"""
+        if not self.changed:
+            # No need to recalculate statistics
+            return
+
+        super().prepare_stats()
+
+        # Mark as not changed
+        self.changed = False
 
 RESULTS = ["".join(result) for result in itertools.product(*["gyb"] * WORD_LENGTH)]
 
@@ -264,14 +284,12 @@ class SolutionGroup(BaseSolutionGroup):
     Use results learned from playing the game to refine possible solutions.
     """
     def filter_solutions(self, word, result):
-        if self.changed:
-            # If the word list has changed, update the stats
-            self._prev_word_list = self._word_list.copy()
-            self.prepare_stats()
-        else:
-            # Otherwise, mark the list as changed,
-            # as it is about to be changed
-            self.changed = True
+        """Remove solutions that are not consistant with word and result."""
+        # Update statistics, if needed
+        self.prepare_stats()
+
+        # Get current word count
+        word_count = len(self)
 
         for index in range(WORD_LENGTH):
             if result[index] == "g":
@@ -328,6 +346,9 @@ class SolutionGroup(BaseSolutionGroup):
                     for count in range(1, present_count + correct_count):
                         self._word_list.difference_update(self._letter_count[letter][count])
 
+        # Mark as change if solutions were eliminated
+        self.changed = word_count != len(self)
+
     def guess_rank(self, guess):
         """
         Calculate rank of a word in this group. Higher rank means better guess.
@@ -350,30 +371,35 @@ class SolutionGroup(BaseSolutionGroup):
         # for further filtering.
         processed_words = set()
         for result in RESULTS:
-            self._word_list.difference_update(processed_words)
-            if not self:
-                # Force this to be marked as changed
-                self.changed = True
-                self.reset()
-                break
-
             # Check if this result can occur
             if not result_possible(guess, result):
                 continue
 
+            # If processed words contains all words, we are done
+            if len(self) == len(processed_words):
+                # No words left to process
+                break
+
+            # Create copy of solution group to process
+            solution_group = self.copy()
+
+            # Remove already processed words. If a word appeared in a
+            # prevous result, word comparison, then it won't appear again
+            solution_group._word_list.difference_update(processed_words)
+
             # Calculate number of words that remain if this result occurs
-            self.filter_solutions(guess, result)
+            solution_group.filter_solutions(guess, result)
 
             # Calculate the percent of words that fall in this group
-            part = len(self)
+            part = len(solution_group)
             if __debug__:
                 total += part # Sanity check
 
-            assert processed_words.isdisjoint(self._word_list), \
+            assert processed_words.isdisjoint(solution_group._word_list), \
                 f"Results have overlapping words: " \
-                f"{processed_words.intersection(self._word_list)}"
+                f"{processed_words.intersection(solution_group._word_list)}"
 
-            processed_words.update(self._word_list)
+            processed_words.update(solution_group._word_list)
 
             # Rank is the highest count of words that can result
             if part > rank:
@@ -381,7 +407,6 @@ class SolutionGroup(BaseSolutionGroup):
                 foil = result
 
             assert len(processed_words) == total
-            self.reset()
 
         assert rank
         assert total == len(self), \
