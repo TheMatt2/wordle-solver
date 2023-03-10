@@ -45,11 +45,11 @@ class WordGroup(BaseWordGroup):
 
             # A copy is likely going to be modified
             # and modifying using stats, so precompute stats
-            word_list.prepare_stats()
+            word_list._prepare_stats()
 
-            assert not word_list.changed, \
+            assert not word_list._changed, \
                 f"{word_list.__class__.__name__} is changed after preparing stats"
-            self.changed = word_list.changed
+            self._changed = word_list._changed
             self._word_list = word_list._word_list.copy()
 
             # As stats are only ever used immutably, just add without copy
@@ -62,7 +62,7 @@ class WordGroup(BaseWordGroup):
             self._word_list = set(word_list)
 
             # Make changed so stats will be calculate if needed
-            self.changed = True
+            self._changed = True
 
     def __len__(self):
         return len(self._word_list)
@@ -82,9 +82,9 @@ class WordGroup(BaseWordGroup):
     def copy(self):
         return self.__class__(self)
 
-    def prepare_stats(self):
+    def _prepare_stats(self):
         """Calculate statistics for the current word list"""
-        if not self.changed:
+        if not self._changed:
             # No need to recalculate statistics
             return
 
@@ -131,7 +131,7 @@ class WordGroup(BaseWordGroup):
                     self._letter_count[letter][count])
 
         # Mark as not changed anymore
-        self.changed = False
+        self._changed = False
 
     @property
     def excluded_letters(self):
@@ -156,7 +156,7 @@ class GuessGroup(WordGroup):
         """
         Filter out guesses that are not possible based on excluded letters.
         """
-        self.prepare_stats()
+        self._prepare_stats()
 
         # Get current word count
         word_count = len(self)
@@ -202,7 +202,7 @@ class GuessGroup(WordGroup):
                     self._word_list.remove(word)
 
         # Mark as change if guesses were eliminated
-        self.changed = word_count != len(self)
+        self._changed = word_count != len(self)
 
 class AllWordsGuessGroup(BaseWordGroup):
     """
@@ -280,7 +280,7 @@ class SolutionGroup(BaseSolutionGroup):
     def filter_solutions(self, word, result):
         """Remove solutions that are not consistant with word and result."""
         # Update statistics, if needed
-        self.prepare_stats()
+        self._prepare_stats()
 
         # Get current word count
         word_count = len(self)
@@ -341,7 +341,7 @@ class SolutionGroup(BaseSolutionGroup):
                         self._word_list.difference_update(self._letter_count[letter][count])
 
         # Mark as change if solutions were eliminated
-        self.changed = word_count != len(self)
+        self._changed = word_count != len(self)
 
     def guess_rank(self, guess):
         """
