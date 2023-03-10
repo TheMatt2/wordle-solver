@@ -227,8 +227,9 @@ class BaseSolutionGroup(WordGroup):
     def __init__(self, word_list):
         if isinstance(word_list, BaseSolutionGroup):
             # Optimized copy initializer
-            super().__init__(word_list)
+            word_list.prepare_stats() # So they are copied accurately
             self.changed = word_list.changed
+            super().__init__(word_list)
         else:
             # Setup internal state, initially true so stats are prepared
             self.changed = True
