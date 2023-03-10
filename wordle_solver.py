@@ -445,9 +445,8 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
         # So we can directly index it
         guess_list = list(guess_group)
 
-        with (
-            ProgressBarMP(len(guess_group), persist = progress) as progress_bar_mp,
-            concurrent.futures.ProcessPoolExecutor(mp) as executor):
+        with ProgressBarMP(len(guess_group), persist = progress) as progress_bar_mp, \
+                concurrent.futures.ProcessPoolExecutor(mp) as executor:
             fs = []
             for i in range(mp):
                 future = executor.submit(solution_group._guess_rank_mp,
