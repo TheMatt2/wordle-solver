@@ -348,23 +348,39 @@ class SolutionGroup(BaseSolutionGroup):
 
     def guess_rank(self, guess):
         """
-        Calculate rank of a word in this group. Higher rank means better guess.
+        Calculate rank of a word in this group.
+        Uses heuristic of max partition size to rank guesses.
+        """
+        best_rank = 0
+        best_foil = None
+
+        for result, solution_part in self.partition(guess):
+            rank = len(solution_part)
+            if rank > best_rank:
+                best_rank = rank
+                best_foil = result
+
+        assert best_rank, f"No partition found for {guess}"
+
+        # Foil is the result that keeps the most combinations
+        return best_rank, best_foil
+
+    def partition(self, guess):
+        """
+        Generate partitions solutions for each possible result of guess.
         """
         # If word has repeated letters, right gives the same amount of information,
         # positions gives a bit less, wrong gives a fair bit less information
-        # Rank = Sum [Pr[permutation] * information]
         # G is correct
         # Y is present
         # B is absent
-        rank = 0
         if __debug__:
             # Total is tracked as a sanity check
             total = 0
 
-        # Words that are already returned from filter_solutions()
-        # will not be returned by other result.
-        # So keep a list of processed words, and don't consider them
-        # for further filtering.
+        # Words that are already returned from filter_solutions() will not be
+        # returned by other result. So keep a list of processed words, and don't
+        # consider them for further filtering.
         processed_words = set()
         for result in RESULTS:
             # Check if this result can occur
@@ -377,53 +393,47 @@ class SolutionGroup(BaseSolutionGroup):
                 break
 
             # Create copy of solution group to process
-            solution_group = self.copy()
+            solution_part = self.copy()
 
             # Remove already processed words. If a word appeared in a
             # prevous result, word comparison, then it won't appear again
-            solution_group._word_list.difference_update(processed_words)
+            solution_part._word_list.difference_update(processed_words)
 
             # Calculate number of words that remain if this result occurs
-            solution_group.filter_solutions(guess, result)
+            solution_part.filter_solutions(guess, result)
 
             # Calculate the percent of words that fall in this group
-            part = len(solution_group)
             if __debug__:
-                total += part # Sanity check
+                total += len(solution_part) # Sanity check
 
-            assert processed_words.isdisjoint(solution_group._word_list), \
+            assert processed_words.isdisjoint(solution_part._word_list), \
                 f"Results have overlapping words: " \
-                f"{processed_words.intersection(solution_group._word_list)}"
+                f"{processed_words.intersection(solution_part._word_list)}"
 
-            processed_words.update(solution_group._word_list)
+            processed_words.update(solution_part._word_list)
 
-            # Rank is the highest count of words that can result
-            if part > rank:
-                rank = part
-                foil = result
+            # Yield the partition, if non-empty
+            if solution_part:
+                yield result, solution_part
 
             assert len(processed_words) == total
 
-        assert rank
         assert total == len(self), \
             f"total = {total} and remaining words {len(self)} differ for guess {guess}"
-
-        # Foil is the result that keeps the most combinations
-        return rank, foil
 
     def _guess_rank_mp(self, guess_group):
         best_guesses = []
         best_rank = None
 
-        for word in guess_group:
-            rank, foil = self.guess_rank(word)
+        for guess in guess_group:
+            rank, foil = self.guess_rank(guess)
 
             if not best_rank or rank < best_rank:
                 best_rank = rank
-                best_guesses = [word]
+                best_guesses = [guess]
 
             elif rank == best_rank:
-                best_guesses.append(word)
+                best_guesses.append(guess)
 
         return best_guesses, best_rank
 
