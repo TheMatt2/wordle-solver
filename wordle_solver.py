@@ -422,8 +422,9 @@ class SolutionGroup(BaseSolutionGroup):
             f"total = {total} and remaining words {len(self)} differ for guess {guess}"
 
     def _guess_rank_mp(self, guess_group):
-        best_guesses = []
         best_rank = None
+        best_guesses = None
+        best_foils = None
 
         for guess in guess_group:
             rank, foil = self.guess_rank(guess)
@@ -431,11 +432,13 @@ class SolutionGroup(BaseSolutionGroup):
             if not best_rank or rank < best_rank:
                 best_rank = rank
                 best_guesses = [guess]
+                best_foils = [foil]
 
             elif rank == best_rank:
                 best_guesses.append(guess)
+                best_foils.append(foil)
 
-        return best_guesses, best_rank
+        return best_rank, best_guesses, best_foils
 
 def filter_guesses(guess_group, solution_group, progress = True):
     """
@@ -456,8 +459,9 @@ def filter_guesses(guess_group, solution_group, progress = True):
 
 def best_guesses(guess_group, solution_group, progress = True, mp = True):
     # Find the best next word
-    best_guesses = []
     best_rank = None
+    best_guesses = None
+    best_foils = None
 
     # Remove extra guesses
     filter_guesses(guess_group, solution_group, progress)
@@ -481,49 +485,54 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
             fs = []
             for i in range(mp):
                 future = executor.submit(solution_group._guess_rank_mp,
-                    progress_bar_mp.worker_loop(guess_list[chunksize * i: chunksize * (i + 1)]))
+                    progress_bar_mp.worker_loop(
+                    guess_list[chunksize * i: chunksize * (i + 1)]))
                 fs.append(future)
 
             progress_bar_mp.parent_loop(lambda x: wait_exception_or_completed(fs, x))
 
             for future in fs:
-                guesses, rank = future.result()
+                rank, guesses, foils = future.result()
 
                 if not best_rank or rank < best_rank:
                     best_rank = rank
                     best_guesses = guesses
+                    best_foils = foils
 
                 elif rank == best_rank:
                     best_guesses.extend(guesses)
+                    best_foils.extend(foils)
 
     else:
         # Use single process
-        for word in progress_bar(guess_group, persist = progress):
-            rank, foil = solution_group.guess_rank(word)
+        for guess in progress_bar(guess_group, persist = progress):
+            rank, foil = solution_group.guess_rank(guess)
 
             if not best_rank or rank < best_rank:
                 best_rank = rank
-                best_guesses = [word]
+                best_guesses = [guess]
+                best_foils = [foil]
 
             elif rank == best_rank:
-                best_guesses.append(word)
+                best_guesses.append(guess)
+                best_foils.append(foil)
 
     # If a guess is in the solution set, that actually makes it
-    # better than any other option
-    guess_in_solutions = False
-    for guess in best_guesses:
+    # better than any other option. Filter down to only guesses in solutions
+    restricted_best_guesses = []
+    restricted_best_foils = []
+    for guess, foil in zip(best_guesses, best_foils):
         if guess in solution_group:
-            guess_in_solutions = True
-            break
+            restricted_best_guesses.append(guess)
+            restricted_best_foils.append(foil)
 
-    if guess_in_solutions:
-        # Filter down to only guesses in solutions
-        best_guesses = [
-            guess for guess in best_guesses if guess in solution_group]
+    if restricted_best_guesses:
+        best_guesses = restricted_best_guesses
+        best_foils = restricted_best_foils
 
     stop = time.perf_counter()
-
     if progress:
         print(f"Calculated Guesses in {stop - start:.3f} secs")
 
-    return best_guesses, best_rank
+    assert len(best_guesses) == len(best_foils), "Number of guesses and foils do not match"
+    return best_rank, best_guesses, best_foils

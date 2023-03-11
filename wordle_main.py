@@ -1,3 +1,5 @@
+from heapq import nsmallest
+
 import wordle_solver
 import wordle_contexts
 from wordle_contexts import ALL_WORDS_TOKEN, WORD_LENGTH
@@ -42,11 +44,20 @@ def choose_context():
 
         return contexts[choice - 1]
 
-def print_first(guesses, count = 10):
-    for guess in guesses:
-        print(guess)
-        count -= 1
-        if not count: break
+def print_first_solutions(solutions, count = 10):
+    for solution in nsmallest(count, solutions):
+        print(solution)
+
+    if len(solutions) > count:
+        print("...")
+    print()
+
+def print_first_guesses(guesses, foils, count = 10):
+    for guess, foil in nsmallest(count, zip(guesses, foils)):
+        print(f"{guess} ({foil})")
+
+    if len(guesses) > count:
+        print("...")
     print()
 
 def is_result(result):
@@ -130,19 +141,23 @@ def main():
 
     # "guesses" is the initial guess for this Wordle game
     # without knowing any information specific to this game
-    init_guesses = wordle_contexts.load_guesses(context, naive)
+    guesses = wordle_contexts.load_guesses(context, naive)
 
-    if not init_guesses:
+    if not guesses:
         # Generate initial guesses
-        init_guesses, _ = wordle_solver.best_guesses(guess_group, solution_group)
-        wordle_contexts.save_guesses(context, naive, init_guesses)
+        rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
+        wordle_contexts.save_guesses(context, naive, guesses)
+    else:
+        # Calculate rank and foil for saved values
+        foils = []
+        for guess in guesses:
+            rank, foil = solution_group.guess_rank(guess)
+            foils.append(foil)
 
-    init_guesses.sort()
-    print_first(init_guesses)
-    best_guess = init_guesses[0]
-    print(f"Best starting word: {best_guess}")
+    print_first_guesses(guesses, foils)
+    guess, foil = min(zip(guesses, foils))
+    print(f"Best starting word: {guess}")
     print("Words Remaining:", len(solution_group))
-    rank, foil = solution_group.guess_rank(best_guess)
     print(f"rank: {rank} worst case: {foil}")
 
     while True:
@@ -159,21 +174,25 @@ def main():
         solution_count = len(solution_group)
 
         print("Words Remaining:", solution_count)
-        print_first(solution_group)
+        print_first_solutions(solution_group)
 
         if len(solution_group) == 2:
             # Only two or less words
             # Best solution is to guess one of the words
-            words = sorted(solution_group)
-            best_guess = words[0]
-            print("Best Next Guess:", words[0])
-            print("Failing Guess:", words[1])
+            guess, guess_b = sorted(solution_group)
+            _, foil = solution_group.guess_rank(guess)
+            _, foil_b = solution_group.guess_rank(guess_b)
+
+            print(f"Best Next Guess: {guess} ({foil})")
+            print(f"Failing Guess: {guess_b} ({foil_b})")
+            del guess_b, foil_b
             continue
 
         if len(solution_group) == 1:
             # Only one solution
-            best_guess = next(iter(solution_group))
-            print("Best Next Guess:", best_guess)
+            guess = next(iter(solution_group))
+            _, foil = solution_group.guess_rank(guess)
+            print(f"Best Next Guess: {guess} ({foil})")
             break
 
         if len(solution_group) == 0:
@@ -182,17 +201,16 @@ def main():
             break
 
         if solution_count_old != solution_count:
-            # No solutions removed
-            # There is no need to recalculate guesses, because guesses are
-            # updated based on the solution group. Solution group has not changed.
-            init_guesses, rank = wordle_solver.best_guesses(guess_group, solution_group)
-            init_guesses.sort()
-            print_first(init_guesses)
-            best_guess = init_guesses[0]
+            # Solutions changed, so update guesses
+            rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
+            assert len(guesses) == len(foils)
+            print_first_guesses(guesses, foils)
+            guess, foil = min(zip(guesses, foils))
 
+        # Otherwise, solutions did not change, so no need to update guesses
+        # Guesses will be filtered next turn if solutions are removed
         # Print best guess, or the prior guess, if word did not restrict solutions
-        print("Best Next Guess:", best_guess)
-        rank, foil = solution_group.guess_rank(best_guess)
+        print("Best Next Guess:", guess)
         print(f"rank: {rank} worst case: {foil}")
 
 if __name__ == "__main__":
