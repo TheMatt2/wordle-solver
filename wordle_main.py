@@ -60,6 +60,43 @@ def is_result(result):
 
     return True
 
+def ask_word(word_list):
+    while True:
+        word = input("Word: ").strip()
+
+        if len(word) != WORD_LENGTH:
+            print(f"{word!r} is not {WORD_LENGTH} letters. Please enter word again.")
+
+        elif word_list != ALL_WORDS_TOKEN and word not in word_list:
+            if input(
+                f"{word!r} is not in the word list. Use this word anyway? (y/n): "
+                ).strip() == "y":
+                break
+        else:
+            # Otherwise, continue normally
+            break
+
+    return word
+
+def ask_result(word):
+    while True:
+        result = input("Result: ").strip()
+
+        # Make sure result format is right
+        if not is_result(result):
+            print(f"{result!r} is not a valid result. Please enter result again.")
+
+        # Make sure result is possible
+        elif not wordle_solver.result_possible(word, result):
+            print(f"{result!r} is not possible for {word!r}. Please enter result again.")
+            continue
+
+        else:
+            # Otherwise, continue normally
+            break
+
+    return result
+
 def main():
     # Select Word List
     context = choose_context()
@@ -109,39 +146,8 @@ def main():
     print(f"rank: {rank} worst case: {foil}")
 
     while True:
-        while True:
-            word = input("Word: ").strip()
-
-            if len(word) != WORD_LENGTH:
-                print(f"{word!r} is not {WORD_LENGTH} letters. Please enter word again.")
-                continue
-
-            if word_list != ALL_WORDS_TOKEN and word not in word_list:
-                if input(
-                    f"{word!r} is not in the word list. Use this word anyway? (y/n): "
-                    ).strip() == "y":
-                    break
-                else:
-                    continue
-
-            # Otherwise, continue normally
-            break
-
-        while True:
-            result = input("Result: ").strip()
-
-            # Make sure result format is right
-            if not is_result(result):
-                print(f"{result!r} is not a valid result. Please enter result again.")
-                continue
-
-            # Make sure result is possible
-            if not wordle_solver.result_possible(word, result):
-                print(f"{result!r} is not possible for {word!r}. Please enter result again.")
-                continue
-
-            # Otherwise, continue normally
-            break
+        word = ask_word(word_list)
+        result = ask_result(word)
 
         if result == "ggggg":
             print("Success!")
