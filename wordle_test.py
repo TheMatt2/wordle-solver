@@ -67,7 +67,7 @@ def wordle_result(guess, solution):
 
     return "".join(result)
 
-def test_wordle(context, naive, solution = None):
+def test_wordle(context, naive, solution = None, progress = True):
     """Play wordle, and time how long it takes.
        If no solution is provided, a worst case scenario is calculated.
        The worst case solution is known as the "foil"
@@ -94,6 +94,7 @@ def test_wordle(context, naive, solution = None):
 
     start = time.perf_counter()
 
+    turns = 0
     while True:
         # If no solution, use foil
         if solution:
@@ -102,13 +103,17 @@ def test_wordle(context, naive, solution = None):
             rank, foil = solution_group.guess_rank(word)
             result = foil
 
-        print(wordle_coloring(word, result))
+        if progress:
+            print(wordle_coloring(word, result))
+        turns += 1 # Number of turns to find solution
 
         if result == "ggggg":
             if not solution:
                 solution = word
 
-            print("Success!")
+            if progress:
+                print("Success!")
+
             break
 
         # Find number of words remaining
@@ -131,15 +136,19 @@ def test_wordle(context, naive, solution = None):
             print("There are no possible remaining solutions.")
             break
 
-        guesses, rank = wordle_solver.best_guesses(guess_group, solution_group, progress = False)
+        guesses, rank = wordle_solver.best_guesses(
+            guess_group, solution_group, progress = None if progress else False)
         guesses.sort()
         word = guesses[0]
 
     stop = time.perf_counter()
 
-    print(
-        f"Test: {wordle_contexts.get_common_name(context)} Naive: {naive} "
-        f"Solution: {solution} Duration: {stop - start:.4f} secs\n")
+    if progress:
+        print(
+            f"Test: {wordle_contexts.get_common_name(context)} Naive: {naive} "
+            f"Solution: {solution} Turns: {turns} Duration: {stop - start:.4f} secs\n")
+
+    return turns
 
 def main():
     init()

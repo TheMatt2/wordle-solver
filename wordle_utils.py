@@ -346,7 +346,7 @@ class ProgressBarMP:
     def close(self):
         """
         Close the progress bar. Verifies progress is complete."""
-        if self.count_value.value != self.length:
+        if self.enabled and self.count_value.value != self.length:
             # Exited cleanly, but not complete
             raise RuntimeError("Progress bar finished early at "
                                f"{self.count_value.value} / {self.length}")

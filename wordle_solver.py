@@ -480,7 +480,8 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
         # So we can directly index it
         guess_list = list(guess_group)
 
-        with ProgressBarMP(len(guess_group), persist = progress) as progress_bar_mp, \
+        with ProgressBarMP(len(guess_group), persist = progress,
+                enabled = progress is not False) as progress_bar_mp, \
                 concurrent.futures.ProcessPoolExecutor(mp) as executor:
             fs = []
             for i in range(mp):
@@ -505,7 +506,8 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
 
     else:
         # Use single process
-        for guess in progress_bar(guess_group, persist = progress):
+        for guess in progress_bar(guess_group, persist = progress,
+                enabled = progress is not False):
             rank, foil = solution_group.guess_rank(guess)
 
             if not best_rank or rank < best_rank:
