@@ -86,14 +86,12 @@ def test_wordle(context, naive, solution = None, progress = True):
     if not guesses:
         # Generate initial guesses
         print("Generating Initial Guesses. Not included in testing time, but will take a while.")
-        guesses, rank = wordle_solver.best_guesses(guess_group, solution_group)
+        rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
         wordle_contexts.save_guesses(context, naive, guesses)
 
     guess = min(guesses)
-
-    start = time.perf_counter()
-
     turns = 0
+    start = time.perf_counter()
     while True:
         # If no solution, use foil
         if solution:
