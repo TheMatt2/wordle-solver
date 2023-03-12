@@ -363,7 +363,7 @@ class SolutionGroup(BaseSolutionGroup):
                 rank = part
                 foil = result
 
-        assert rank, f"No partition found for {guess}"
+        assert rank, f"No partitions found for {guess}"
 
         # Use the number of partitions as a tie breaker
         # Since lower rank is better, use 1 / partitions
