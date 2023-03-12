@@ -351,19 +351,19 @@ class SolutionGroup(BaseSolutionGroup):
         Calculate rank of a word in this group.
         Uses heuristic of max partition size to rank guesses.
         """
-        best_rank = 0
-        best_foil = None
+        rank = 0
+        foil = None
 
         for result, solution_part in self.partition(guess):
-            rank = len(solution_part)
-            if rank > best_rank:
-                best_rank = rank
-                best_foil = result
+            part = len(solution_part)
+            if part > rank:
+                rank = part
+                foil = result
 
-        assert best_rank, f"No partition found for {guess}"
+        assert rank, f"No partition found for {guess}"
 
         # Foil is the result that keeps the most combinations
-        return best_rank, best_foil
+        return rank, foil
 
     def partition(self, guess):
         """
