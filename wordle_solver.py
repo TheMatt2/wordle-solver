@@ -354,13 +354,22 @@ class SolutionGroup(BaseSolutionGroup):
         rank = 0
         foil = None
 
+        partitions = 0
         for result, solution_part in self.partition(guess):
+            partitions += 1
+
             part = len(solution_part)
             if part > rank:
                 rank = part
                 foil = result
 
         assert rank, f"No partition found for {guess}"
+
+        # Use the number of partitions as a tie breaker
+        # Since lower rank is better, use 1 / partitions
+        # Since 0 < 1 / (partitions + 1) < 1, just add partitions as a decimal
+        # (Using p + 1 to avoid the case where partitions is 1)
+        rank +=  1 / (partitions + 1)
 
         # Foil is the result that keeps the most combinations
         return rank, foil

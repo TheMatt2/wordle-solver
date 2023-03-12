@@ -158,7 +158,7 @@ def main():
     guess, foil = min(zip(guesses, foils))
     print(f"Best starting word: {guess}")
     print("Words Remaining:", len(solution_group))
-    print(f"rank: {rank} worst case: {foil}")
+    print(f"rank: {rank:.4f} worst case: {foil}")
 
     while True:
         word = ask_word(word_list)
@@ -211,7 +211,7 @@ def main():
         # Guesses will be filtered next turn if solutions are removed
         # Print best guess, or the prior guess, if word did not restrict solutions
         print("Best Next Guess:", guess)
-        print(f"rank: {rank} worst case: {foil}")
+        print(f"rank: {rank:.4f} worst case: {foil}")
 
 if __name__ == "__main__":
     main()
