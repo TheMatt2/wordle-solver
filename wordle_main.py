@@ -169,11 +169,11 @@ def main():
             break
 
         # Find number of words remaining
-        solution_count_old = len(solution_group)
-        solution_group.filter_solutions(word, result)
+        # Track prior count to see if solutions were removed
         solution_count = len(solution_group)
+        solution_group.filter_solutions(word, result)
 
-        print("Words Remaining:", solution_count)
+        print("Words Remaining:", len(solution_group))
         print_first_solutions(solution_group)
 
         if len(solution_group) == 2:
@@ -200,7 +200,7 @@ def main():
             print("There are no possible remaining solutions.")
             break
 
-        if solution_count_old != solution_count:
+        if solution_count != len(solution_group):
             # Solutions changed, so update guesses
             rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
             assert len(guesses) == len(foils)

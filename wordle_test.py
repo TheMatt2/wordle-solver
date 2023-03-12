@@ -89,8 +89,7 @@ def test_wordle(context, naive, solution = None, progress = True):
         guesses, rank = wordle_solver.best_guesses(guess_group, solution_group)
         wordle_contexts.save_guesses(context, naive, guesses)
 
-    guesses.sort()
-    word = guesses[0]
+    guess = min(guesses)
 
     start = time.perf_counter()
 
@@ -98,18 +97,18 @@ def test_wordle(context, naive, solution = None, progress = True):
     while True:
         # If no solution, use foil
         if solution:
-            result = wordle_result(word, solution)
+            result = wordle_result(guess, solution)
         else:
-            rank, foil = solution_group.guess_rank(word)
-            result = foil
+            rank, result = solution_group.guess_rank(guess)
 
         if progress:
-            print(wordle_coloring(word, result))
+            print(wordle_coloring(guess, result))
+
         turns += 1 # Number of turns to find solution
 
         if result == "ggggg":
             if not solution:
-                solution = word
+                solution = guess
 
             if progress:
                 print("Success!")
@@ -117,29 +116,25 @@ def test_wordle(context, naive, solution = None, progress = True):
             break
 
         # Find number of words remaining
-        solution_group.filter_solutions(word, result)
+        # Track prior count to see if solutions were removed
+        solution_count = len(solution_group)
+        solution_group.filter_solutions(guess, result)
 
-        if len(solution_group) == 2:
+        # Make sure solutions were removed
+        assert len(solution_group) < solution_count, f"No solutions elimated for guess {guess}"
+
+        if  1 <= len(solution_group) <= 2:
             # Only two or less words
-            # Best solution is to guess one of the words
-            words = sorted(solution_group)
-            word = words[0]
-            continue
+            # Best guess is either of the words
+            guess = min(solution_group)
+        else:
+            # There should be a solution found
+            assert len(solution_group) != 0, "There are no remaining solutions"
 
-        if len(solution_group) == 1:
-            # Only one solution
-            word = next(iter(solution_group))
-            continue
-
-        if len(solution_group) == 0:
-            # No remaining solutions
-            print("There are no possible remaining solutions.")
-            break
-
-        guesses, rank = wordle_solver.best_guesses(
-            guess_group, solution_group, progress = None if progress else False)
-        guesses.sort()
-        word = guesses[0]
+            # Calculate best guess
+            rank, guesses, foils = wordle_solver.best_guesses(
+                guess_group, solution_group, progress = None if progress else False)
+            guess = min(guesses)
 
     stop = time.perf_counter()
 
