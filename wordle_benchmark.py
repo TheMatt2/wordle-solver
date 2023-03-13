@@ -55,6 +55,9 @@ def benchmark(solutions, context, naive, mp = True):
         start = time.perf_counter()
         if mp:
             # Use multiprocessing to accelerate processing
+            for fd in [f, None]:
+                print(f"Calculating Guesses using {mp} processes...", file = fd)
+
             with concurrent.futures.ProcessPoolExecutor(mp) as executor:
                 for solution, turns in progress_bar(executor.map(
                         partial(_wordle_test_mp, context = context, naive = naive),
