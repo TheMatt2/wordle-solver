@@ -20,7 +20,7 @@ WORDLE_CONTEXTS_COMMON_NAME = {
     "wordlegame_org": "wordlegame.org Wordle",
     "wordplay_com": "wordplay.com Wordle",
     "wordlewebsite_com_daily": "wordlewebsite.com Wordle (Daily)",
-    "wordlewebsite_com_unlimited": 'wordlewebsite.com Wordle ("Unlimited")',
+    "wordlewebsite_com_unlimited": 'wordlewebsite.com Wordle (Unlimited)',
     "absurdle": "Absurdle (https://qntm.org/files/absurdle/absurdle.html)",
     "flappy_birdle": "Flappy Birdle (https://flappybirdle.com)"}
 
