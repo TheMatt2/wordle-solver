@@ -4,9 +4,7 @@ time taken.
 """
 import sys
 import time
-
 import concurrent.futures
-from functools import wraps
 from multiprocessing import Manager
 
 try:
@@ -14,12 +12,12 @@ try:
 except NameError:
     clear_line = lambda: None
 
-def progress_bar(iterable, ticks = 10, delay = 0.5,
-                persist = False, enabled = None,
-                file = None, timer = time.perf_counter):
+def progress_bar(iterable, length = None, ticks = 10, delay = 0.5,
+        persist = False, enabled = None, file = None, timer = time.perf_counter):
     """
     Show a simply progress bar for iterable.
     iterable: The object to return items from.
+    length: The number of items in iterable. If None, found using len()
     ticks: Maximum number of updates per second.
     delay: Delay in seconds before showing the progress bar.
     persist: Should the progress bar be cleared at the end.
@@ -40,7 +38,8 @@ def progress_bar(iterable, ticks = 10, delay = 0.5,
         return
 
     count = 0
-    length = len(iterable)
+    if length is None:
+        length = len(iterable)
     iterable = iter(iterable)
 
     # Start returning values from iterable until
