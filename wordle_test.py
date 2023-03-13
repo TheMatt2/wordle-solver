@@ -29,6 +29,8 @@ def wordle_result(guess, solution):
     # Result calculation is basically check if guess letter matches
     # solution, but there is some complexity to account for duplicate
     # letters.
+    assert len(guess) == WORD_LENGTH, f"guess {guess!r} is not {WORD_LENGTH} letters"
+    assert len(solution) == WORD_LENGTH, f"solution {solution!r} is not {WORD_LENGTH} letters"
 
     # "u" is unassigned temporary value
     result = ["u"] * WORD_LENGTH
@@ -67,7 +69,7 @@ def wordle_result(guess, solution):
 
     return "".join(result)
 
-def test_wordle(context, naive, solution = None, progress = True):
+def test_wordle(context, naive, solution = None, progress = True, mp = True):
     """Play wordle, and time how long it takes.
        If no solution is provided, a worst case scenario is calculated.
        The worst case solution is known as the "foil"
@@ -86,7 +88,7 @@ def test_wordle(context, naive, solution = None, progress = True):
     if not guesses:
         # Generate initial guesses
         print("Generating Initial Guesses. Not included in testing time, but will take a while.")
-        rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
+        rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group, mp = mp)
         wordle_contexts.save_guesses(context, naive, guesses)
 
     guess = min(guesses)
@@ -131,7 +133,7 @@ def test_wordle(context, naive, solution = None, progress = True):
 
             # Calculate best guess
             rank, guesses, foils = wordle_solver.best_guesses(
-                guess_group, solution_group, progress = None if progress else False)
+                guess_group, solution_group, progress = None if progress else False, mp = mp)
             guess = min(guesses)
 
     stop = time.perf_counter()
