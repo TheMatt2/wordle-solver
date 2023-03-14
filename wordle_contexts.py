@@ -6,9 +6,6 @@ import json
 
 ALL_WORDS_TOKEN = "ALL_WORDS_ARE_VALID_GUESSES"
 
-LETTERS = "abcdefghijklmnopqrstuvwxyz"
-WORD_LENGTH = 5
-
 import wordle_solver
 import wordle_scraper
 
@@ -91,22 +88,7 @@ def ask_context():
     return Context(context_id, naive)
 
 class Context:
-    """
-    context_id
-    word_list
-    solutions
-    solution_group
-    guess_group
-    naive
-    word_length
-    letters
-    name
-
-    scrap word_list, solutions
-    pregenerate initial guess
-     - foils
-    pregenerate 2nd stage guesses given first guess was used
-    """
+    """Context to control details of a Wordle game."""
     letters = "abcdefghijklmnopqrstuvwxyz"
     word_length = 5
 
@@ -121,7 +103,7 @@ class Context:
     def name(self):
         return WORDLE_CONTEXTS_NAME[self.context_id]
 
-    def _load_solutions_word_list(self):
+    def _load_word_list_solutions(self):
         # Check if word list exists
         word_list_file = os.path.join(
             WORDLE_CACHE, WORDLE_WORD_LIST_FILE_FORMAT.format(self.context_id))
@@ -137,17 +119,17 @@ class Context:
                 word_list = ALL_WORDS_TOKEN
 
             # Verify results are valid
-            wordle_scraper.check_solutions_word_lists(solutions, word_list)
+            wordle_scraper.check_word_list_solutions(word_list, solutions, self)
             solutions.sort()
             if word_list != ALL_WORDS_TOKEN:
                 word_list.sort()
         else:
             # Get results from internet
             print("Getting solutions and word list from internet.")
-            solutions, word_list = WORDLE_CONTEXTS_SCRAPER[self.context_id]()
+            word_list, solutions = WORDLE_CONTEXTS_SCRAPER[self.context_id]()
 
             # Verify results are valid
-            wordle_scraper.check_solutions_word_lists(solutions, word_list)
+            wordle_scraper.check_word_list_solutions(word_list, solutions, self)
             solutions.sort()
             if word_list != ALL_WORDS_TOKEN:
                 word_list.sort()
@@ -156,16 +138,16 @@ class Context:
             if not os.path.exists(WORDLE_CACHE):
                 os.mkdir(WORDLE_CACHE)
 
-            save_words(solutions, solutions_file)
             save_words(word_list, word_list_file)
+            save_words(solutions, solutions_file)
 
-        self._solutions = solutions
         self._word_list = word_list
+        self._solutions = solutions
 
     @property
     def word_list(self):
         if self._word_list is None:
-            self._load_solutions_word_list()
+            self._load_word_list_solutions()
 
         if self._word_list == ALL_WORDS_TOKEN:
             return AllWordsWordList(self)
@@ -175,7 +157,7 @@ class Context:
     @property
     def solutions(self):
         if self._solutions is None:
-            self._load_solutions_word_list()
+            self._load_word_list_solutions()
 
         if self.naive:
             # In naive mode, solutions are all words
@@ -232,12 +214,12 @@ class Context:
 
     def get_guess_group(self):
         if self.word_list == ALL_WORDS_TOKEN:
-            return wordle_solver.AllWordsGuessGroup()
+            return wordle_solver.AllWordsGuessGroup(self)
         else:
-            return wordle_solver.GuessGroup(self.word_list)
+            return wordle_solver.GuessGroup(self.word_list, self)
 
     def get_solution_group(self):
-        return wordle_solver.SolutionGroup(self.solutions)
+        return wordle_solver.SolutionGroup(self.solutions, self)
 
 class AllWordsWordList:
     """Special optimized object to represent all possible words are valid."""

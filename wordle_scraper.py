@@ -13,9 +13,9 @@ import requests
 import itertools
 import urllib.parse
 
-from wordle_contexts import ALL_WORDS_TOKEN, LETTERS, WORD_LENGTH
+from wordle_contexts import ALL_WORDS_TOKEN
 
-def check_solutions_word_lists(solutions, word_list):
+def check_word_list_solutions(word_list, solutions, context):
     # Verify solution and word lists make sense
     if word_list != ALL_WORDS_TOKEN:
         words = itertools.chain(solutions, word_list)
@@ -24,11 +24,11 @@ def check_solutions_word_lists(solutions, word_list):
         words = solutions
 
     for word in words:
-        if len(word) != WORD_LENGTH:
-            raise ValueError(f"{word!r} is not {WORD_LENGTH} letters: ")
+        if len(word) != context.word_length:
+            raise ValueError(f"{word!r} is not {context.word_length} letters: ")
 
         for c in word:
-            if c not in LETTERS:
+            if c not in context.letters:
                 raise ValueError(f"{word!r} has illegal letter {c!r}")
 
     # There should be no duplicates
@@ -48,11 +48,11 @@ NYTIMES_WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
 NYTIMES_WORDLE_JS_CRIB = 'src="https://www.nytimes.com/games-assets/v2/wordle.'
 
 # Known values of wordlists to find them in html / javascript
-# NYTIMES_SOLUTIONS_CRIB = '["cigar","rebut","sissy",' # September, 2022
-NYTIMES_SOLUTIONS_CRIB = '"cigar","rebut","sissy",' # February, 2023, Solutions are present, but not the start of the array
-
 # NYTIMES_WORD_LIST_CRIB = '["aahed","aalii","aargh",' # June, 2022
 NYTIMES_WORD_LIST_CRIB = '["aahed","aalii","aapas",' # September, 2022
+
+# NYTIMES_SOLUTIONS_CRIB = '["cigar","rebut","sissy",' # September, 2022
+NYTIMES_SOLUTIONS_CRIB = '"cigar","rebut","sissy",' # February, 2023, Solutions are present, but not the start of the array
 
 def get_quoted_crib(content, crib, start_quote = '"', stop_quote = '"', keep_quotes = False):
     """Extract a quoted segment with the given crib of content"""
@@ -84,22 +84,21 @@ def scrap_nytimes():
     # Grab wordle javascript
     wordle_js = requests.get(js_url).text
 
+    # Get word list
+    word_list_raw = get_bracketed_crib(wordle_js, NYTIMES_WORD_LIST_CRIB)
+    word_list = json.loads(word_list_raw)
+
     # Go to crib
     solutions_raw = get_bracketed_crib(wordle_js, NYTIMES_SOLUTIONS_CRIB, "", "]")
 
     # List does not begin with a bracket, add it
     solutions_raw = "[" + solutions_raw
-
     solutions = json.loads(solutions_raw)
-
-    # Get word list
-    word_list_raw = get_bracketed_crib(wordle_js, NYTIMES_WORD_LIST_CRIB)
-    word_list = json.loads(word_list_raw)
 
     # # NYT word list does not include any of the solutions
     # word_list = word_list + solutions
     # Feb 2023, the word list now contains solutions, just not sorted
-    return solutions, word_list
+    return word_list, solutions
 
 WORDLEGAME_WORD_LIST_URL = "https://wordlegame.org/files/wordle/en/dictionary.json" # September 2022, v39.67
 WORDLEGAME_SOLUTIONS_URL = "https://wordlegame.org/files/wordle/en/targets.json" # September 2022, v39.67
@@ -114,23 +113,23 @@ def scrap_wordlegame():
     # word sizes. This currently only supports 5 letters, so remove the other words
 
     # Despite marked with utf-8 encoding, wordlegame.org seems
-    # to *sometimes* actually encode utf-8-sig
-    r = requests.get(WORDLEGAME_SOLUTIONS_URL)
-    r.encoding = r.apparent_encoding
-    solutions = r.json()
-    solutions = [word for word in solutions if len(word) == 5]
-
-    # Despite marked with utf-8 encoding, wordlegame.org seems
     # to *sometimes* actually encoded utf-8-sig
     r = requests.get(WORDLEGAME_WORD_LIST_URL)
     r.encoding = r.apparent_encoding
     word_list = r.json()
     word_list = [word for word in word_list if len(word) == 5]
 
+    # Despite marked with utf-8 encoding, wordlegame.org seems
+    # to *sometimes* actually encode utf-8-sig
+    r = requests.get(WORDLEGAME_SOLUTIONS_URL)
+    r.encoding = r.apparent_encoding
+    solutions = r.json()
+    solutions = [word for word in solutions if len(word) == 5]
+
     # Known duplicates that need to be removed
-    solutions = list(set(solutions))
     word_list = list(set(word_list))
-    return solutions, word_list
+    solutions = list(set(solutions))
+    return word_list, solutions
 
 def scrap_wordplay():
     # Wordplay does not actually expose the word list, or solutions
@@ -159,17 +158,17 @@ def scrap_wordlewebsite_daily():
     wordle_js = "\n".join([line for line in wordle_js.split("\n")
         if "//" not in line and "/*" not in line and "*/" not in line])
 
-    # Go to crib
-    solutions_raw = get_bracketed_crib(wordle_js, WORDLEWEBSITE_DAILY_SOLUTIONS_CRIB, "[", "]")
-    solutions = json.loads(solutions_raw)
-
     # Get word list
     word_list_raw = get_bracketed_crib(wordle_js, WORDLEWEBSITE_DAILY_WORD_LIST_CRIB, "[", "]")
     word_list = json.loads(word_list_raw)
 
+    # Go to crib
+    solutions_raw = get_bracketed_crib(wordle_js, WORDLEWEBSITE_DAILY_SOLUTIONS_CRIB, "[", "]")
+    solutions = json.loads(solutions_raw)
+
     # word list does not include any of the solutions
     word_list = word_list + solutions
-    return solutions, word_list
+    return word_list, solutions
 
 # Because Wordle Website seems to use a NYT codebase for the daily, and Wordlegame.org for the "unlimited"
 WORDLEWEBSITE_UNLIMITED_WORD_LIST_URL = "https://wordlewebsite.com/game/hurdleunlimited/files/wordle/en/dictionary.json" # March 2023
@@ -186,22 +185,22 @@ def scrap_wordlewebsite_unlimited():
 
     # Despite marked with utf-8 encoding, wordlegame.org seems
     # to *sometimes* actually encoded utf-8-sig
-    r = requests.get(WORDLEWEBSITE_UNLIMITED_SOLUTIONS_URL)
-    r.encoding = r.apparent_encoding
-    solutions = r.json()
-    solutions = [word for word in solutions if len(word) == 5]
-
-    # Despite marked with utf-8 encoding, wordlegame.org seems
-    # to *sometimes* actually encoded utf-8-sig
     r = requests.get(WORDLEWEBSITE_UNLIMITED_WORD_LIST_URL)
     r.encoding = r.apparent_encoding
     word_list = r.json()
     word_list = [word for word in word_list if len(word) == 5]
 
+    # Despite marked with utf-8 encoding, wordlegame.org seems
+    # to *sometimes* actually encoded utf-8-sig
+    r = requests.get(WORDLEWEBSITE_UNLIMITED_SOLUTIONS_URL)
+    r.encoding = r.apparent_encoding
+    solutions = r.json()
+    solutions = [word for word in solutions if len(word) == 5]
+
     # Known duplicates that need to be removed
-    solutions = list(set(solutions))
     word_list = list(set(word_list))
-    return solutions, word_list
+    solutions = list(set(solutions))
+    return word_list, solutions
 
 ABSURDLE_URL = "https://qntm.org/files/absurdle/absurdle.html"
 ABSURDLE_JS_CRIB = 'src="main.'
@@ -247,10 +246,10 @@ def scrap_absurdle():
     word_list = word_list + solutions
 
     # Remove duplicates
-    solutions = list(set(solutions))
     word_list = list(set(word_list))
+    solutions = list(set(solutions))
 
-    return solutions, word_list
+    return word_list, solutions
 
 FLAPPY_BIRDLE_URL = "https://flappybirdle.com"
 FLAPPY_BIRDLE_JS_CRIB = 'src="/static/js/main.'
@@ -276,4 +275,4 @@ def scrap_flappy_birdle():
 
     # Birdle word list is all possible words
     # Use magic token to indicate all words
-    return solutions, ALL_WORDS_TOKEN
+    return ALL_WORDS_TOKEN, solutions

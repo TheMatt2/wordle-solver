@@ -6,7 +6,6 @@ import math
 import concurrent.futures
 from multiprocessing import cpu_count
 
-from wordle_contexts import LETTERS, WORD_LENGTH
 from wordle_utils import progress_bar, ProgressBarMP, wait_exception_or_completed
 
 class BaseWordGroup(metaclass = ABCMeta):
@@ -39,7 +38,18 @@ class WordGroup(BaseWordGroup):
     """
     Keep statistics on the words for refining solutions and guesses.
     """
-    def __init__(self, word_list):
+    def __init__(self, word_list, context = None):
+        if context is None:
+            # Only allow context to be None if word_list is a WordGroup
+            if not isinstance(word_list, WordGroup):
+                raise TypeError(
+                    "argument 'context' is required if word_list is not a WordGroup()")
+
+        elif isinstance(word_list, WordGroup):
+            # If word_list is a WordGroup, context should be none
+            raise TypeError(
+                "argument 'context' is not allowed if word_list is a WordGroup()")
+
         if isinstance(word_list, WordGroup):
             # Optimized copy initializer
 
@@ -56,6 +66,7 @@ class WordGroup(BaseWordGroup):
             self._word_breakdown = word_list._word_breakdown
             self._word_contains = word_list._word_contains
             self._letter_count = word_list._letter_count
+            self.context = word_list.context
 
         else:
             # Save word list
@@ -63,6 +74,7 @@ class WordGroup(BaseWordGroup):
 
             # Make changed so stats will be calculate if needed
             self._changed = True
+            self.context = context
 
     def __len__(self):
         return len(self._word_list)
@@ -80,7 +92,7 @@ class WordGroup(BaseWordGroup):
         # For pickling
         # Do not save stats, as they are useless if changed
         # Even if not changed, it is still likely faster to recalculate
-        return {"_word_list": self._word_list, "_changed": True}
+        return {"_word_list": self._word_list, "_changed": True, "context": self.context}
 
     def copy(self):
         return self.__class__(self)
@@ -93,34 +105,34 @@ class WordGroup(BaseWordGroup):
 
         # Word breakdown
         self._word_breakdown = [
-            {l: set() for l in LETTERS} for i in range(WORD_LENGTH)]
+            {l: set() for l in self.context.letters} for i in range(self.context.word_length)]
 
         for word in self._word_list:
-            for index in range(WORD_LENGTH):
+            for index in range(self.context.word_length):
                 self._word_breakdown[index][word[index]].add(word)
 
         # Make Word breakdown frozensets
-        for index in range(WORD_LENGTH):
-            for letter in LETTERS:
+        for index in range(self.context.word_length):
+            for letter in self.context.letters:
                 self._word_breakdown[index][letter] = frozenset(
                     self._word_breakdown[index][letter])
 
         # Word contains
-        self._word_contains = {l: set() for l in LETTERS}
-        for letter in LETTERS:
-            for index in range(WORD_LENGTH):
+        self._word_contains = {l: set() for l in self.context.letters}
+        for letter in self.context.letters:
+            for index in range(self.context.word_length):
                 self._word_contains[letter].update(
                     self._word_breakdown[index][letter])
 
         # Make Word contains frozensets
-        for letter in LETTERS:
+        for letter in self.context.letters:
             self._word_contains[letter] = frozenset(self._word_contains[letter])
 
         # Letter count
         # Create a bucket for each letter and count of that letter in word
         # Note that some buckets will always be empty
         self._letter_count = {
-            l: {c: set() for c in range(1, WORD_LENGTH + 1)} for l in LETTERS}
+            l: {c: set() for c in range(1, self.context.word_length + 1)} for l in self.context.letters}
 
         for word in self._word_list:
             for letter in set(word):
@@ -128,8 +140,8 @@ class WordGroup(BaseWordGroup):
                 self._letter_count[letter][count].add(word)
 
         # Make letter count frozensets
-        for letter in LETTERS:
-            for count in range(1, WORD_LENGTH + 1):
+        for letter in self.context.letters:
+            for count in range(1, self.context.word_length + 1):
                 self._letter_count[letter][count] = frozenset(
                     self._letter_count[letter][count])
 
@@ -143,12 +155,12 @@ class WordGroup(BaseWordGroup):
         included_letters = set()
         for word in self:
             included_letters.update(word)
-            if len(included_letters) == len(LETTERS):
+            if len(included_letters) == len(self.context.letters):
                 # All letters are present
-                assert included_letters == set(LETTERS)
+                assert included_letters == set(self.context.letters)
                 break
 
-        excluded_letters = included_letters.symmetric_difference(LETTERS)
+        excluded_letters = included_letters.symmetric_difference(self.context.letters)
         return excluded_letters
 
 class GuessGroup(WordGroup):
@@ -165,11 +177,11 @@ class GuessGroup(WordGroup):
         word_count = len(self)
 
         # Create a set of all words that contain excluded letters, grouped by count
-        suspect_breakdown = {index: set() for index in range(1, WORD_LENGTH + 1)}
+        suspect_breakdown = {index: set() for index in range(1, self.context.word_length + 1)}
         for letter in excluded_letters:
             for word in self._word_contains[letter]:
                 count = 0
-                for index in range(WORD_LENGTH):
+                for index in range(self.context.word_length):
                     if word[index] in excluded_letters:
                         count += 1
 
@@ -178,13 +190,13 @@ class GuessGroup(WordGroup):
         # Starting with the words with the most excluded letters
         # Since a word with only excluded letters will return result bbbbb
         # There is no information to be gained from it
-        self._word_list.difference_update(suspect_breakdown[WORD_LENGTH])
+        self._word_list.difference_update(suspect_breakdown[self.context.word_length])
 
-        for count in range(WORD_LENGTH - 1, 0, -1):
+        for count in range(self.context.word_length - 1, 0, -1):
             for word in suspect_breakdown[count]:
                 # Check if a word exists that contains all of the non-excluded letters
                 superior_words = None
-                for index in range(WORD_LENGTH):
+                for index in range(self.context.word_length):
                     if word[index] not in excluded_letters:
                         word_set = self._word_breakdown[index][word[index]]
 
@@ -197,7 +209,7 @@ class GuessGroup(WordGroup):
                     f"All letters in word {word} are excluded, but count is {count}"
 
                 # Remove superior words if they contain excluded letters
-                for other_count in range(count, WORD_LENGTH + 1):
+                for other_count in range(count, self.context.word_length + 1):
                     superior_words.difference_update(suspect_breakdown[other_count])
 
                 if superior_words:
@@ -213,25 +225,26 @@ class AllWordsGuessGroup(BaseWordGroup):
     of letters as words. Generates the list on the fly
     to avoid needing to store all of it in memory.
     """
-    def __init__(self, excluded_letters = None):
+    def __init__(self, context, excluded_letters = None):
         if excluded_letters is None:
             excluded_letters = set()
 
         self.excluded_letters = excluded_letters
+        self.context = context
 
     def __len__(self):
-        return (len(LETTERS) - len(self.excluded_letters)) ** WORD_LENGTH
+        return (len(self.context.letters) - len(self.excluded_letters)) ** self.context.word_length
 
     def __contains__(self, val):
-        if isinstance(val, str) and len(val) == WORD_LENGTH:
+        if isinstance(val, str) and len(val) == self.context.word_length:
             return self.excluded_letters.disjoint(val)
         return False
 
     def __iter__(self):
         """Iterate over all possible words"""
         # Use product() to create all words of possible letters
-        included_letters = self.excluded_letters.symmetric_difference(LETTERS)
-        for word in itertools.product(*[included_letters] * WORD_LENGTH):
+        included_letters = self.excluded_letters.symmetric_difference(self.context.letters)
+        for word in itertools.product(*[included_letters] * self.context.word_length):
             yield "".join(word)
 
     def copy(self):
@@ -257,17 +270,11 @@ class BaseSolutionGroup(WordGroup):
         """
         pass
 
-RESULTS = ["".join(result) for result in itertools.product(*["gyb"] * WORD_LENGTH)]
-
-# You can't have 4 known letters, and 1 incorrectly positioned
-RESULTS = [result for result in RESULTS if result.count("y") != 1 or "b" in result]
-RESULTS.reverse()
-
-def result_possible(word, result):
+def result_possible(word, result, context):
     # If a letter is duplicated, then the first instance must be found
     absent = set()
 
-    for index in range(WORD_LENGTH):
+    for index in range(context.word_length):
         if result[index] == "b":
             absent.add(word[index])
         elif result[index] == "y":
@@ -280,6 +287,24 @@ class SolutionGroup(BaseSolutionGroup):
     """
     Use results learned from playing the game to refine possible solutions.
     """
+    # Create list of possible results
+    _RESULTS = {}
+
+    @property
+    def results(self):
+        """Get list of possible results"""
+        if self.context.word_length in self._RESULTS:
+            return self._RESULTS[self.context.word_length]
+
+        # Calculate results
+        results = ["".join(result) for result in itertools.product(*["gyb"] * self.context.word_length)]
+
+        # You can't have 4 known letters, and 1 incorrectly positioned
+        results = [result for result in results if result.count("y") != 1 or "b" in result]
+        results.reverse()
+        self._RESULTS[self.context.word_length] = results
+        return results
+
     def filter_solutions(self, word, result):
         """Remove solutions that are not consistant with word and result."""
         # Update statistics, if needed
@@ -288,7 +313,7 @@ class SolutionGroup(BaseSolutionGroup):
         # Get current word count
         word_count = len(self)
 
-        for index in range(WORD_LENGTH):
+        for index in range(self.context.word_length):
             if result[index] == "g":
                 # Keep only words that have that letter in that position
                 self._word_list.intersection_update(self._word_breakdown[index][word[index]])
@@ -316,7 +341,7 @@ class SolutionGroup(BaseSolutionGroup):
                 correct_count = 0
 
                 indexes = []
-                for index in range(WORD_LENGTH):
+                for index in range(self.context.word_length):
                     if word[index] != letter:
                         continue
 
@@ -391,9 +416,9 @@ class SolutionGroup(BaseSolutionGroup):
         # returned by other result. So keep a list of processed words, and don't
         # consider them for further filtering.
         processed_words = set()
-        for result in RESULTS:
+        for result in self.results:
             # Check if this result can occur
-            if not result_possible(guess, result):
+            if not result_possible(guess, result, self.context):
                 continue
 
             # If processed words contains all words, we are done

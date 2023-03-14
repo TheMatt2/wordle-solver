@@ -57,8 +57,7 @@ def benchmark(context, mp = True):
                     turn_total += turns
                     turn_stats[turns] += 1
 
-                    print(f"{solution} solved in {turns} "
-                        f"Turns average: {turn_total / turn_count:.2f}",
+                    print(f"{solution} solved in {turns} Turns average: {turn_total / turn_count:.2f}",
                         file = f, flush = True)
         else:
             for solution in progress_bar(solutions):
@@ -70,7 +69,6 @@ def benchmark(context, mp = True):
                 print(f"{solution} solved in {turns} "
                     f"Turns average: {turn_total / turn_count:.2f}",
                     file = f, flush = True)
-
         stop = time.perf_counter()
 
         # Print both to file and stdout
