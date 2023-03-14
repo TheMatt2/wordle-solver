@@ -2,7 +2,6 @@ from heapq import nsmallest
 
 import wordle_solver
 import wordle_contexts
-from wordle_contexts import ALL_WORDS_TOKEN, WORD_LENGTH
 
 # TODOs
 # - Implement non-heuristic solver
@@ -23,27 +22,6 @@ from wordle_contexts import ALL_WORDS_TOKEN, WORD_LENGTH
 #   Don't cache everything, but cache all operations that take
 #   more than a set time limit.
 
-def choose_context():
-    print("Please select a Wordle version to use:")
-    contexts = wordle_contexts.get_contexts()
-    for i in range(len(contexts)):
-        print(f"{i+1}) {wordle_contexts.get_common_name(contexts[i])}")
-
-    # Have user choose wordle version
-    while True:
-        choice = input("Wordle version: ").strip()
-
-        if not choice.isdigit():
-            print(f"Invalid wordle version choice {choice!r}")
-            continue
-
-        choice = int(choice)
-        if choice > len(contexts):
-            print(f"Invalid wordle version choice {choice!r}")
-            continue
-
-        return contexts[choice - 1]
-
 def print_first_solutions(solutions, count = 10):
     for solution in nsmallest(count, solutions):
         print(solution)
@@ -60,10 +38,10 @@ def print_first_guesses(guesses, foils, count = 10):
         print("...")
     print()
 
-def is_result(result):
+def is_result(result, context):
     # Check if this is a valid result
     # 5 letters, bgy
-    if len(result) != WORD_LENGTH:
+    if len(result) != context.word_length:
         return False
 
     if not {"b", "g", "y"}.issuperset(result):
@@ -71,14 +49,14 @@ def is_result(result):
 
     return True
 
-def ask_word(word_list):
+def ask_word(word_list, context):
     while True:
         word = input("Word: ").strip()
 
-        if len(word) != WORD_LENGTH:
-            print(f"{word!r} is not {WORD_LENGTH} letters. Please enter word again.")
+        if len(word) != context.word_length:
+            print(f"{word!r} is not {context.word_length} letters. Please enter word again.")
 
-        elif word_list != ALL_WORDS_TOKEN and word not in word_list:
+        elif word not in word_list:
             if input(
                 f"{word!r} is not in the word list. Use this word anyway? (y/n): "
                 ).strip() == "y":
@@ -89,12 +67,12 @@ def ask_word(word_list):
 
     return word
 
-def ask_result(word):
+def ask_result(word, context):
     while True:
         result = input("Result: ").strip()
 
         # Make sure result format is right
-        if not is_result(result):
+        if not is_result(result, context):
             print(f"{result!r} is not a valid result. Please enter result again.")
 
         # Make sure result is possible
@@ -110,49 +88,22 @@ def ask_result(word):
 
 def main():
     # Select Word List
-    context = choose_context()
-    solutions, word_list = wordle_contexts.load_solutions_word_list(context)
+    context = wordle_contexts.ask_context()
 
-    if word_list != ALL_WORDS_TOKEN:
-        print(f"Loaded {len(word_list)} words.")
-    print(f"Loaded {len(solutions)} possible solutions.")
+    # Get the word list to check words against
+    word_list = context.word_list
+    guess_group = context.get_guess_group()
+    solution_group = context.get_solution_group()
 
-    # There is no naive mode, if word list is all words
-    if word_list != ALL_WORDS_TOKEN:
-        naive = input("Naive Mode?: ").strip() == "y"
-    else:
-        naive = False
+    print(f"Word list has {len(word_list)} words.")
+    print(f"There are {len(solution_group)} possible solutions.")
 
-    if naive:
-        solutions = word_list
-
-    solution_group = wordle_solver.SolutionGroup(solutions)
-
-    # Hard mode doesn't work yet, disable for now
-    ## hard_mode = input("Hard Mode?: ").strip() == "y"
-    hard_mode = False
-
-    if hard_mode:
-        guess_group = solution_group
-    elif word_list == ALL_WORDS_TOKEN:
-        guess_group = wordle_solver.AllWordsGuessGroup()
-    else:
-        guess_group = wordle_solver.GuessGroup(word_list)
-
-    # "guesses" is the initial guess for this Wordle game
-    # without knowing any information specific to this game
-    guesses = wordle_contexts.load_guesses(context, naive)
-
-    if not guesses:
-        # Generate initial guesses
-        rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
-        wordle_contexts.save_guesses(context, naive, guesses)
-    else:
-        # Calculate rank and foil for saved values
-        foils = []
-        for guess in guesses:
-            rank, foil = solution_group.guess_rank(guess)
-            foils.append(foil)
+    guesses = context.get_initial_guesses()
+    # Calculate rank and foil for saved values
+    foils = []
+    for guess in guesses:
+        rank, foil = solution_group.guess_rank(guess)
+        foils.append(foil)
 
     print_first_guesses(guesses, foils)
     guess, foil = min(zip(guesses, foils))
@@ -161,8 +112,8 @@ def main():
     print(f"rank: {rank:.4f} worst case: {foil}")
 
     while True:
-        word = ask_word(word_list)
-        result = ask_result(word)
+        word = ask_word(word_list, context)
+        result = ask_result(word, context)
 
         if result == "ggggg":
             print("Success!")

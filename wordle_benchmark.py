@@ -9,62 +9,28 @@ from functools import partial
 from collections import Counter
 from multiprocessing import cpu_count
 
-import wordle_main
 import wordle_test
-import wordle_solver
 import wordle_contexts
 
 from wordle_utils import progress_bar
-from wordle_contexts import ALL_WORDS_TOKEN
 
 def main():
-    context = wordle_main.choose_context()
-    solutions, word_list = wordle_contexts.load_solutions_word_list(context)
+    context = wordle_contexts.ask_context()
 
-    if word_list != ALL_WORDS_TOKEN:
-        print(f"Loaded {len(word_list)} words.")
-    print(f"Loaded {len(solutions)} possible solutions.")
+    print(f"Word list has {len(context.word_list)} words.")
+    print(f"There are {len(context.solutions)} possible solutions.")
 
-    # There is no naive mode, if word list is all words
-    if word_list != ALL_WORDS_TOKEN:
-        naive = input("Naive Mode?: ").strip() == "y"
-    else:
-        naive = False
+    # Make sure initial guess is generated
+    context.get_initial_guesses()
+    benchmark(context)
 
-    if naive:
-        solutions = word_list
-
-    # Make sure initial guess is already generated
-    solution_group = wordle_solver.SolutionGroup(solutions)
-
-    # Hard mode doesn't work yet, disable for now
-    ## hard_mode = input("Hard Mode?: ").strip() == "y"
-    hard_mode = False
-
-    if hard_mode:
-        guess_group = solution_group
-    elif word_list == ALL_WORDS_TOKEN:
-        guess_group = wordle_solver.AllWordsGuessGroup()
-    else:
-        guess_group = wordle_solver.GuessGroup(word_list)
-
-    # "guesses" is the initial guess for this Wordle game
-    # without knowing any information specific to this game
-    guesses = wordle_contexts.load_guesses(context, naive)
-
-    if not guesses:
-        # Generate initial guesses
-        rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
-        wordle_contexts.save_guesses(context, naive, guesses)
-
-    benchmark(solutions, context, naive)
-
-def _wordle_test_mp(solution, context, naive, progress = False, mp = False):
-    turns = wordle_test.test_wordle(
-        context, naive, solution, progress = progress, mp = mp)
+def _wordle_test_mp(solution, context, progress = False, mp = False):
+    turns = wordle_test.wordle_test(solution, context, progress = progress, mp = mp)
     return solution, turns
 
-def benchmark(solutions, context, naive, mp = True):
+def benchmark(context, mp = True):
+    solutions = context.solutions
+
     random.seed(12345)
     random.shuffle(solutions)
 
@@ -84,7 +50,7 @@ def benchmark(solutions, context, naive, mp = True):
 
             with concurrent.futures.ProcessPoolExecutor(mp) as executor:
                 for solution, turns in progress_bar(executor.map(
-                        partial(_wordle_test_mp, context = context, naive = naive),
+                        partial(_wordle_test_mp, context = context),
                         solutions), len(solutions)):
 
                     turn_count += 1
@@ -96,8 +62,7 @@ def benchmark(solutions, context, naive, mp = True):
                         file = f, flush = True)
         else:
             for solution in progress_bar(solutions):
-                turns = wordle_test.test_wordle(
-                    context, naive, solution, progress = False, mp = False)
+                turns = wordle_test.wordle_test(solution, context, progress = False, mp = False)
                 turn_count += 1
                 turn_total += turns
                 turn_stats[turns] += 1

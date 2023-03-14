@@ -4,18 +4,19 @@ wordle_contexts.py
 import os
 import json
 
+ALL_WORDS_TOKEN = "ALL_WORDS_ARE_VALID_GUESSES"
+
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
 WORD_LENGTH = 5
 
-ALL_WORDS_TOKEN = "ALL_WORDS_ARE_VALID_GUESSES"
-
+import wordle_solver
 import wordle_scraper
 
-WORDLE_CONTEXTS = [
+WORDLE_CONTEXT_IDS = [
     "new_york_times", "wordlegame_org", "wordplay_com", "wordlewebsite_com_daily",
     "wordlewebsite_com_unlimited", "absurdle", "flappy_birdle"]
 
-WORDLE_CONTEXTS_COMMON_NAME = {
+WORDLE_CONTEXTS_NAME = {
     "new_york_times": "New York Times Wordle",
     "wordlegame_org": "wordlegame.org Wordle",
     "wordplay_com": "wordplay.com Wordle",
@@ -33,17 +34,13 @@ WORDLE_CONTEXTS_SCRAPER = {
     "absurdle": wordle_scraper.scrap_absurdle,
     "flappy_birdle": wordle_scraper.scrap_flappy_birdle}
 
+WORDLE_IS_ALL_WORDS = {"flappy_birdle": True}
+
 WORDLE_CACHE = "cache"
 WORDLE_SOLUTIONS_FILE_FORMAT = "solutions_{}.txt"
 WORDLE_WORD_LIST_FILE_FORMAT = "word_list_{}.txt"
 WORDLE_NAIVE_GUESSES_FILE_FORMAT = "naive_guesses_{}.json"
 WORDLE_SMART_GUESSES_FILE_FORMAT = "smart_guesses_{}.json"
-
-def get_contexts():
-    return WORDLE_CONTEXTS
-
-def get_common_name(context):
-    return WORDLE_CONTEXTS_COMMON_NAME[context]
 
 def load_words(filename):
     with open(filename) as f:
@@ -64,69 +61,191 @@ def save_words(words, filename):
             for word in words:
                 f.write(f"{word}\n")
 
-def load_solutions_word_list(context):
-    # Check if word list exists
-    solutions_file = os.path.join(
-        WORDLE_CACHE, WORDLE_SOLUTIONS_FILE_FORMAT.format(context))
-    word_list_file = os.path.join(
-        WORDLE_CACHE, WORDLE_WORD_LIST_FILE_FORMAT.format(context))
+def ask_context():
+    print("Please select a Wordle version to use:")
+    for i in range(len(WORDLE_CONTEXT_IDS)):
+        print(f"{i+1}) {WORDLE_CONTEXTS_NAME[WORDLE_CONTEXT_IDS[i]]}")
 
-    if os.path.isfile(solutions_file) and os.path.isfile(word_list_file):
-        # Cache is present, load from cache
-        solutions = load_words(solutions_file)
-        word_list = load_words(word_list_file)
+    # Have user choose wordle version
+    while True:
+        choice = input("Wordle version: ").strip()
 
-        if word_list == [ALL_WORDS_TOKEN]:
-            word_list = ALL_WORDS_TOKEN
+        if not choice.isdigit():
+            print(f"Invalid wordle version choice {choice!r}")
+            continue
 
-        # Verify results are valid
-        wordle_scraper.check_solutions_word_lists(solutions, word_list)
-        solutions.sort()
-        if word_list != ALL_WORDS_TOKEN:
-            word_list.sort()
+        choice = int(choice)
+        if choice > len(WORDLE_CONTEXT_IDS):
+            print(f"Invalid wordle version choice {choice!r}")
+            continue
+
+        context_id = WORDLE_CONTEXT_IDS[choice - 1]
+        break
+
+    # Ask for naive, if not all words
+    if not WORDLE_IS_ALL_WORDS.get(context_id, False):
+        naive = input("Naive Mode?: ").strip() == "y"
     else:
-        # Get results from internet
-        print("Getting solutions and word list from internet.")
-        solutions, word_list = WORDLE_CONTEXTS_SCRAPER[context]()
+        naive = False
 
-        # Verify results are valid
-        wordle_scraper.check_solutions_word_lists(solutions, word_list)
-        solutions.sort()
-        if word_list != ALL_WORDS_TOKEN:
-            word_list.sort()
+    return Context(context_id, naive)
 
-        # Save results to cache
-        if not os.path.exists(WORDLE_CACHE):
-            os.mkdir(WORDLE_CACHE)
+class Context:
+    """
+    context_id
+    word_list
+    solutions
+    solution_group
+    guess_group
+    naive
+    word_length
+    letters
+    name
 
-        save_words(solutions, solutions_file)
-        save_words(word_list, word_list_file)
+    scrap word_list, solutions
+    pregenerate initial guess
+     - foils
+    pregenerate 2nd stage guesses given first guess was used
+    """
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    word_length = 5
 
-    return solutions, word_list
+    def __init__(self, context_id, naive):
+        self.context_id = context_id
+        self.naive = naive
+        self._solutions = None
+        self._word_list = None
+        self._guesses = None
 
-def load_guesses(context, naive):
-    """Get the initial best guess for this context."""
-    if naive:
-        guesses_filename = WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(context)
-    else:
-        guesses_filename = WORDLE_SMART_GUESSES_FILE_FORMAT.format(context)
+    @property
+    def name(self):
+        return WORDLE_CONTEXTS_NAME[self.context_id]
 
-    guesses_filename = os.path.join(WORDLE_CACHE, guesses_filename)
+    def _load_solutions_word_list(self):
+        # Check if word list exists
+        word_list_file = os.path.join(
+            WORDLE_CACHE, WORDLE_WORD_LIST_FILE_FORMAT.format(self.context_id))
+        solutions_file = os.path.join(
+            WORDLE_CACHE, WORDLE_SOLUTIONS_FILE_FORMAT.format(self.context_id))
 
-    # If opening file fails, silently fail to indicate results invalid
-    try:
-        with open(guesses_filename) as f:
-            return json.load(f)
-    except FileNotFoundError:
-        pass
+        if os.path.isfile(word_list_file) and os.path.isfile(solutions_file):
+            # Cache is present, load from cache
+            word_list = load_words(word_list_file)
+            solutions = load_words(solutions_file)
 
-def save_guesses(context, naive, guesses):
-    """Set the initial best guess for this context."""
-    if naive:
-        guesses_filename = WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(context)
-    else:
-        guesses_filename = WORDLE_SMART_GUESSES_FILE_FORMAT.format(context)
+            if word_list == [ALL_WORDS_TOKEN]:
+                word_list = ALL_WORDS_TOKEN
 
-    guesses_filename = os.path.join(WORDLE_CACHE, guesses_filename)
-    with open(guesses_filename, "w") as f:
-        json.dump(guesses, f)
+            # Verify results are valid
+            wordle_scraper.check_solutions_word_lists(solutions, word_list)
+            solutions.sort()
+            if word_list != ALL_WORDS_TOKEN:
+                word_list.sort()
+        else:
+            # Get results from internet
+            print("Getting solutions and word list from internet.")
+            solutions, word_list = WORDLE_CONTEXTS_SCRAPER[self.context_id]()
+
+            # Verify results are valid
+            wordle_scraper.check_solutions_word_lists(solutions, word_list)
+            solutions.sort()
+            if word_list != ALL_WORDS_TOKEN:
+                word_list.sort()
+
+            # Save results to cache
+            if not os.path.exists(WORDLE_CACHE):
+                os.mkdir(WORDLE_CACHE)
+
+            save_words(solutions, solutions_file)
+            save_words(word_list, word_list_file)
+
+        self._solutions = solutions
+        self._word_list = word_list
+
+    @property
+    def word_list(self):
+        if self._word_list is None:
+            self._load_solutions_word_list()
+
+        if self._word_list == ALL_WORDS_TOKEN:
+            return AllWordsWordList(self)
+
+        return self._word_list.copy()
+
+    @property
+    def solutions(self):
+        if self._solutions is None:
+            self._load_solutions_word_list()
+
+        if self.naive:
+            # In naive mode, solutions are all words
+            return self.word_list.copy()
+        else:
+            return self._solutions.copy()
+
+    def _load_guesses(self):
+        """Get the initial best guess for this context."""
+        if self.naive:
+            guesses_filename = WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(self.context_id)
+        else:
+            guesses_filename = WORDLE_SMART_GUESSES_FILE_FORMAT.format(self.context_id)
+
+        guesses_filename = os.path.join(WORDLE_CACHE, guesses_filename)
+
+        # If opening file fails, silently fail to indicate results invalid
+        try:
+            with open(guesses_filename) as f:
+                return json.load(f)
+        except FileNotFoundError:
+            pass
+
+    def _save_guesses(self, guesses):
+        """Set the initial best guess for this context."""
+        if self.naive:
+            guesses_filename = WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(self.context_id)
+        else:
+            guesses_filename = WORDLE_SMART_GUESSES_FILE_FORMAT.format(self.context_id)
+
+        guesses_filename = os.path.join(WORDLE_CACHE, guesses_filename)
+        with open(guesses_filename, "w") as f:
+            json.dump(guesses, f)
+
+    def get_initial_guesses(self):
+        """Get the initial best guess for this context."""
+        if self._guesses is not None:
+            return guesses
+
+        guesses = self._load_guesses()
+        if not guesses:
+            # Generate initial guesses
+            solution_group = wordle_solver.SolutionGroup(self.solutions)
+
+            if self.word_list == ALL_WORDS_TOKEN:
+                guess_group = wordle_solver.AllWordsGuessGroup()
+            else:
+                guess_group = wordle_solver.GuessGroup(self.word_list)
+
+            rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
+            self._save_guesses(guesses)
+
+        return guesses
+
+    def get_guess_group(self):
+        if self.word_list == ALL_WORDS_TOKEN:
+            return wordle_solver.AllWordsGuessGroup()
+        else:
+            return wordle_solver.GuessGroup(self.word_list)
+
+    def get_solution_group(self):
+        return wordle_solver.SolutionGroup(self.solutions)
+
+class AllWordsWordList:
+    """Special optimized object to represent all possible words are valid."""
+    def __init__(self, context):
+        self.context = context
+
+    def __len__(self):
+        return len(self.context.letters) ** self.context.word_length
+
+    def __contains__(self, word):
+        return len(word) == self.context.word_length
