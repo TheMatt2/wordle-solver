@@ -54,43 +54,46 @@ NYTIMES_SOLUTIONS_CRIB = '"cigar","rebut","sissy",' # February, 2023, Solutions 
 # NYTIMES_WORD_LIST_CRIB = '["aahed","aalii","aargh",' # June, 2022
 NYTIMES_WORD_LIST_CRIB = '["aahed","aalii","aapas",' # September, 2022
 
+def get_quoted_crib(content, crib, start_quote = '"', stop_quote = '"', keep_quotes = False):
+    """Extract a quoted segment with the given crib of content"""
+    # Go to crib
+    index = content.index(crib)
+    # Find start
+    start = content.index(start_quote, index)
+    # Find stop
+    stop = content.index(stop_quote, start + len(start_quote))
+    # Return segment, not including quotes
+
+    if keep_quotes:
+        return content[start: stop + len(stop_quote)]
+    else:
+        return content[start + len(start_quote): stop]
+
+def get_bracketed_crib(content, crib, start_quote = '[', stop_quote = ']', keep_quotes = True):
+    """Extract a bracketed segment with the given crib of content"""
+    return get_quoted_crib(content, crib, start_quote, stop_quote, keep_quotes)
+
 def scrap_nytimes():
     # Grab wordle homepage and extract link to javascript
     wordle_page = requests.get(NYTIMES_WORDLE_URL).text
 
-    # Go to crib
-    js_crib_index = wordle_page.index(NYTIMES_WORDLE_JS_CRIB)
-    # Jump to start of url
-    js_url_start = wordle_page.index('"', js_crib_index) + 1
-    # Get url end
-    js_url_stop = wordle_page.index('"', js_url_start)
-
     # Extract javascript file
-    js_url = wordle_page[js_url_start:js_url_stop]
+    js_url = get_quoted_crib(wordle_page, NYTIMES_WORDLE_JS_CRIB)
     assert js_url.endswith(".js"), "failed to extract NYT javascript URL"
-
-    # print("NYT Wordle Javascript URL:", js_url)
 
     # Grab wordle javascript
     wordle_js = requests.get(js_url).text
 
     # Go to crib
-    solutions_start = wordle_js.index(NYTIMES_SOLUTIONS_CRIB)
-    solutions_stop = wordle_js.index("]", solutions_start) + 1
+    solutions_raw = get_bracketed_crib(wordle_js, NYTIMES_SOLUTIONS_CRIB, "", "]")
 
-    solutions_raw = wordle_js[solutions_start:solutions_stop]
-
-    # If list does not begin with a bracket, add it
-    if solutions_raw[0] != "[":
-        solutions_raw = "[" + solutions_raw
+    # List does not begin with a bracket, add it
+    solutions_raw = "[" + solutions_raw
 
     solutions = json.loads(solutions_raw)
 
     # Get word list
-    word_list_start = wordle_js.index(NYTIMES_WORD_LIST_CRIB)
-    word_list_stop = wordle_js.index("]", word_list_start) + 1
-
-    word_list_raw = wordle_js[word_list_start:word_list_stop]
+    word_list_raw = get_bracketed_crib(wordle_js, NYTIMES_WORD_LIST_CRIB)
     word_list = json.loads(word_list_raw)
 
     # # NYT word list does not include any of the solutions
@@ -111,7 +114,7 @@ def scrap_wordlegame():
     # word sizes. This currently only supports 5 letters, so remove the other words
 
     # Despite marked with utf-8 encoding, wordlegame.org seems
-    # to *sometimes* actually encoded utf-8-sig
+    # to *sometimes* actually encode utf-8-sig
     r = requests.get(WORDLEGAME_SOLUTIONS_URL)
     r.encoding = r.apparent_encoding
     solutions = r.json()
@@ -157,22 +160,11 @@ def scrap_wordlewebsite_daily():
         if "//" not in line and "/*" not in line and "*/" not in line])
 
     # Go to crib
-    solutions_start = wordle_js.index(WORDLEWEBSITE_DAILY_SOLUTIONS_CRIB)
-    solutions_stop = wordle_js.index("]", solutions_start) + 1
-
-    solutions_raw = wordle_js[solutions_start:solutions_stop]
-
-    # If list does not begin with a bracket, add it
-    if solutions_raw[0] != "[":
-        solutions_raw = "[" + solutions_raw
-
+    solutions_raw = get_bracketed_crib(wordle_js, WORDLEWEBSITE_DAILY_SOLUTIONS_CRIB, "[", "]")
     solutions = json.loads(solutions_raw)
 
     # Get word list
-    word_list_start = wordle_js.index(WORDLEWEBSITE_DAILY_WORD_LIST_CRIB)
-    word_list_stop = wordle_js.index("]", word_list_start) + 1
-
-    word_list_raw = wordle_js[word_list_start:word_list_stop]
+    word_list_raw = get_bracketed_crib(wordle_js, WORDLEWEBSITE_DAILY_WORD_LIST_CRIB, "[", "]")
     word_list = json.loads(word_list_raw)
 
     # word list does not include any of the solutions
@@ -221,15 +213,8 @@ ABSURDLE_WORD_LIST_CRIB = 'I=R({AA:"HEDLI'
 def scrap_absurdle():
     wordle_page = requests.get(ABSURDLE_URL).text
 
-    # Go to crib
-    js_crib_index = wordle_page.index(ABSURDLE_JS_CRIB)
-    # Jump to start of url
-    js_url_start = wordle_page.index('"', js_crib_index) + 1
-    # Get url end
-    js_url_stop = wordle_page.index('"', js_url_start)
-
     # Extract javascript file
-    js_url = wordle_page[js_url_start:js_url_stop]
+    js_url = get_quoted_crib(wordle_page, ABSURDLE_JS_CRIB)
     assert js_url.endswith(".js"), "failed to extract Absurdle javascript URL"
 
     js_url = urllib.parse.urljoin(ABSURDLE_URL, js_url)
@@ -237,15 +222,8 @@ def scrap_absurdle():
     # Grab wordle javascript
     wordle_js = requests.get(js_url).text
 
-    # Go to crib
-    word_list_crib_index = wordle_js.index(ABSURDLE_WORD_LIST_CRIB)
-    # Find start of JSON object
-    js_url_start = wordle_js.index('{', word_list_crib_index)
-    # Get url end
-    js_url_stop = wordle_js.index('}', js_url_start)
-
     # Extract word list as json object
-    word_list_raw = wordle_js[js_url_start:js_url_stop + 1]
+    word_list_raw = get_bracketed_crib(wordle_js, ABSURDLE_WORD_LIST_CRIB, "{", "}")
     word_list_json = hjson.loads(word_list_raw)
 
     word_list = []
@@ -255,16 +233,8 @@ def scrap_absurdle():
             word_list.append((prefix + suffix).lower())
 
     # Get solutions
-
-    # Go to crib
-    solutions_crib_index = wordle_js.index(ABSURDLE_SOLUTIONS_CRIB)
-    # Find start of JSON object
-    js_url_start = wordle_js.index('{', solutions_crib_index)
-    # Get url end
-    js_url_stop = wordle_js.index('}', js_url_start)
-
     # Extract word list as json object
-    solutions_raw = wordle_js[js_url_start:js_url_stop + 1]
+    solutions_raw = get_bracketed_crib(wordle_js, ABSURDLE_SOLUTIONS_CRIB, "{", "}")
     solutions_json = hjson.loads(solutions_raw)
 
     solutions = []
@@ -292,30 +262,18 @@ def scrap_flappy_birdle():
     # Grab wordle homepage and extract link to javascript
     wordle_page = requests.get(FLAPPY_BIRDLE_URL).text
 
-    # Go to crib
-    js_crib_index = wordle_page.index(FLAPPY_BIRDLE_JS_CRIB)
-    # Jump to start of url
-    js_url_start = wordle_page.index('"', js_crib_index) + 1
-    # Get url end
-    js_url_stop = wordle_page.index('"', js_url_start)
-
     # Extract javascript file
-    js_url = wordle_page[js_url_start:js_url_stop]
+    js_url = get_quoted_crib(wordle_page, FLAPPY_BIRDLE_JS_CRIB)
     assert js_url.endswith(".js"), "failed to extract Birdle javascript URL"
 
     js_url = urllib.parse.urljoin(FLAPPY_BIRDLE_URL, js_url)
-    # print("Birdle Javascript URL:", js_url)
 
     # Grab wordle javascript
     wordle_js = requests.get(js_url).text
 
-    # Go to crib
-    solutions_start = wordle_js.index(FLAPPY_BIRDLE_SOLUTIONS_CRIB)
-    solutions_stop = wordle_js.index("]", solutions_start) + 1
-
-    solutions_raw = wordle_js[solutions_start:solutions_stop]
+    solutions_raw = get_bracketed_crib(wordle_js, FLAPPY_BIRDLE_SOLUTIONS_CRIB)
     solutions = json.loads(solutions_raw)
 
-    # # Birdle word list is all possible words
+    # Birdle word list is all possible words
     # Use magic token to indicate all words
     return solutions, ALL_WORDS_TOKEN
