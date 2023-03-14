@@ -11,6 +11,7 @@ from multiprocessing import cpu_count
 
 import wordle_main
 import wordle_test
+import wordle_solver
 import wordle_contexts
 
 from wordle_utils import progress_bar
@@ -32,6 +33,29 @@ def main():
 
     if naive:
         solutions = word_list
+
+    # Make sure initial guess is already generated
+    solution_group = wordle_solver.SolutionGroup(solutions)
+
+    # Hard mode doesn't work yet, disable for now
+    ## hard_mode = input("Hard Mode?: ").strip() == "y"
+    hard_mode = False
+
+    if hard_mode:
+        guess_group = solution_group
+    elif word_list == ALL_WORDS_TOKEN:
+        guess_group = wordle_solver.AllWordsGuessGroup()
+    else:
+        guess_group = wordle_solver.GuessGroup(word_list)
+
+    # "guesses" is the initial guess for this Wordle game
+    # without knowing any information specific to this game
+    guesses = wordle_contexts.load_guesses(context, naive)
+
+    if not guesses:
+        # Generate initial guesses
+        rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
+        wordle_contexts.save_guesses(context, naive, guesses)
 
     benchmark(solutions, context, naive)
 
@@ -56,7 +80,7 @@ def benchmark(solutions, context, naive, mp = True):
         if mp:
             # Use multiprocessing to accelerate processing
             for fd in [f, None]:
-                print(f"Calculating Guesses using {mp} processes...", file = fd)
+                print(f"Calculating Benchmark using {mp} processes...", file = fd)
 
             with concurrent.futures.ProcessPoolExecutor(mp) as executor:
                 for solution, turns in progress_bar(executor.map(
