@@ -140,10 +140,10 @@ def main():
 
     start = time.perf_counter()
     for solution in [None, "magic", "abort", "krill", "staff"]:
-        wordle_test(wordle_contexts.Context("new_york_times", False), solution)
-        wordle_test(wordle_contexts.Context("wordlegame_org", False), solution)
-        wordle_test(wordle_contexts.Context("new_york_times", True), solution)
-        wordle_test(wordle_contexts.Context("wordlegame_org", True), solution)
+        wordle_test(solution, wordle_contexts.Context("new_york_times", False))
+        wordle_test(solution, wordle_contexts.Context("wordlegame_org", False))
+        wordle_test(solution, wordle_contexts.Context("new_york_times", True))
+        wordle_test(solution, wordle_contexts.Context("wordlegame_org", True))
 
     stop = time.perf_counter()
     print(f"Tests Duration {stop - start:.4f} secs")

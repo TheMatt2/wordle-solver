@@ -200,12 +200,8 @@ class Context:
         guesses = self._load_guesses()
         if not guesses:
             # Generate initial guesses
-            solution_group = wordle_solver.SolutionGroup(self.solutions)
-
-            if self.word_list == ALL_WORDS_TOKEN:
-                guess_group = wordle_solver.AllWordsGuessGroup()
-            else:
-                guess_group = wordle_solver.GuessGroup(self.word_list)
+            guess_group = self.get_guess_group()
+            solution_group = self.get_solution_group()
 
             rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
             self._save_guesses(guesses)
