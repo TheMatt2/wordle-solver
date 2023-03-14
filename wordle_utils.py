@@ -4,8 +4,8 @@ time taken.
 """
 import sys
 import time
+import multiprocessing
 import concurrent.futures
-from multiprocessing import Manager
 
 try:
     from colorama.ansi import clear_line
@@ -241,12 +241,13 @@ class ProgressBarMP:
         self.enabled = enabled
         self.file = file
         self.timer = timer
+        self.progress_shown = False
 
         # The count of completed task needs to be kept.
         # But time remaining is actually a separate operation.
         # As the time remaining is the time of the longest taking task.
         if manager is None:
-            manager = Manager()
+            manager = multiprocessing.Manager()
 
         # Use an explicit lock so shared objects share a lock
         # https://bugs.python.org/issue35786 !!!
@@ -300,7 +301,6 @@ class ProgressBarMP:
             return
 
         # Start showing progress bar
-        progress_shown = False
         try:
             while True:
                 # Get count, length
@@ -311,11 +311,11 @@ class ProgressBarMP:
                     break
 
                 # Clear progress line
-                if progress_shown: self.file.write(clear_line())
+                if self.progress_shown: self.file.write(clear_line())
 
                 # Print the progress
                 print_progress(count, self.length, self.timer() - start, file = self.file)
-                progress_shown = True
+                self.progress_shown = True
 
                 # Wait for next tick
                 if wait_check(self.delay):
@@ -323,18 +323,11 @@ class ProgressBarMP:
                     break
         finally:
             # Clear progress up until now
-            if progress_shown: self.file.write(clear_line())
+            if self.progress_shown: self.file.write(clear_line())
 
             # Print final progress
             print_progress(count, self.length, self.timer() - start, file = self.file)
-
-            if self.persist:
-                # Show progress bar permanently.
-                self.file.write("\n")
-            else:
-                # Use format code to clear progress bar
-                self.file.write(clear_line())
-            self.file.flush()
+            self.progress_shown = True
 
     def is_finished(self):
         """
@@ -342,10 +335,29 @@ class ProgressBarMP:
         """
         return self.count_value.value >= self.length
 
+    def complete(self):
+        """
+        Mark progress bar as complete. Even if not all items been processed.
+        """
+        # NOTE: It is assumed worker processes will have already exited.
+        with self.lock:
+            self.count_value.value = self.length
+
     def close(self):
         """
         Close the progress bar. Verifies progress is complete."""
-        if self.enabled and self.count_value.value != self.length:
-            # Exited cleanly, but not complete
-            raise RuntimeError("Progress bar finished early at "
-                               f"{self.count_value.value} / {self.length}")
+        if self.enabled:
+            if self.progress_shown:
+                if self.persist:
+                    # Show progress bar permanently.
+                    self.file.write("\n")
+                else:
+                    # Use format code to clear progress bar
+                    self.file.write(clear_line())
+
+                self.file.flush()
+
+            if self.count_value.value != self.length:
+                # Exited cleanly, but not complete
+                raise RuntimeError("Progress bar finished early at "
+                                f"{self.count_value.value} / {self.length}")
