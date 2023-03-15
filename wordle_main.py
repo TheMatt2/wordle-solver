@@ -115,7 +115,7 @@ def main():
         word = ask_word(word_list, context)
         result = ask_result(word, context)
 
-        if result == "ggggg":
+        if result == "g" * context.word_length:
             print("Success!")
             break
 

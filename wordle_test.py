@@ -96,7 +96,7 @@ def wordle_test(solution, context, progress = True, mp = True):
 
         turns += 1 # Number of turns to find solution
 
-        if result == "ggggg":
+        if result == "g" * context.word_length:
             if not solution:
                 solution = guess
 
@@ -111,7 +111,7 @@ def wordle_test(solution, context, progress = True, mp = True):
         solution_group.filter_solutions(guess, result)
 
         # Make sure solutions were removed
-        assert len(solution_group) < solution_count, f"No solutions elimated for guess {guess}"
+        assert len(solution_group) < solution_count, f"No solutions eliminated for guess {guess}"
 
         if  1 <= len(solution_group) <= 2:
             # Only two or less words
@@ -141,9 +141,9 @@ def main():
     start = time.perf_counter()
     for solution in [None, "magic", "abort", "krill", "staff"]:
         wordle_test(solution, wordle_contexts.Context("new_york_times", False))
-        wordle_test(solution, wordle_contexts.Context("wordlegame_org", False))
+        wordle_test(solution, wordle_contexts.Context("wordlegame_org", False, 5))
         wordle_test(solution, wordle_contexts.Context("new_york_times", True))
-        wordle_test(solution, wordle_contexts.Context("wordlegame_org", True))
+        wordle_test(solution, wordle_contexts.Context("wordlegame_org", True, 5))
 
     stop = time.perf_counter()
     print(f"Tests Duration {stop - start:.4f} secs")

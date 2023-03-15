@@ -31,13 +31,13 @@ WORDLE_CONTEXTS_SCRAPER = {
     "absurdle": wordle_scraper.scrap_absurdle,
     "flappy_birdle": wordle_scraper.scrap_flappy_birdle}
 
-WORDLE_IS_ALL_WORDS = {"flappy_birdle": True}
+WORDLE_CONTEXTS_IS_ALL_WORDS = {"flappy_birdle": True}
+WORDLE_CONTEXTS_WORD_LENGTHS = {"wordlegame_org": [4, 11]}
 
 WORDLE_CACHE = "cache"
-WORDLE_SOLUTIONS_FILE_FORMAT = "solutions_{}.txt"
-WORDLE_WORD_LIST_FILE_FORMAT = "word_list_{}.txt"
-WORDLE_NAIVE_GUESSES_FILE_FORMAT = "naive_guesses_{}.json"
-WORDLE_SMART_GUESSES_FILE_FORMAT = "smart_guesses_{}.json"
+WORDLE_WORD_LIST_FILE_FORMAT = "word_list_{context_id}.txt"
+WORDLE_SOLUTIONS_FILE_FORMAT = "solutions_{context_id}.txt"
+WORDLE_GUESSES_FILE_FORMAT = "guesses_{naive}_{context_id}_{word_length:d}.json"
 
 def load_words(filename):
     with open(filename) as f:
@@ -59,42 +59,80 @@ def save_words(words, filename):
                 f.write(f"{word}\n")
 
 def ask_context():
-    print("Please select a Wordle version to use:")
+    print("Please select a Wordle Version to use:")
     for i in range(len(WORDLE_CONTEXT_IDS)):
         print(f"{i+1}) {WORDLE_CONTEXTS_NAME[WORDLE_CONTEXT_IDS[i]]}")
 
     # Have user choose wordle version
     while True:
-        choice = input("Wordle version: ").strip()
+        choice = input("Wordle Version: ").strip()
 
         if not choice.isdigit():
-            print(f"Invalid wordle version choice {choice!r}")
+            print(f"Invalid Wordle Version Choice {choice!r}")
             continue
 
         choice = int(choice)
         if choice > len(WORDLE_CONTEXT_IDS):
-            print(f"Invalid wordle version choice {choice!r}")
+            print(f"Invalid Wordle Version Choice {choice!r}")
             continue
 
         context_id = WORDLE_CONTEXT_IDS[choice - 1]
         break
 
+    # Ask for word length, if in question
+    word_length = WORDLE_CONTEXTS_WORD_LENGTHS.get(context_id, 5)
+
+    if not isinstance(word_length, int):
+        # Choose from multiple word length
+        word_min, word_max = word_length
+
+        while True:
+            choice = input(f"Word Length [{word_min}, {word_max}]: ").strip()
+
+            if not choice.isdigit():
+                print(f"Invalid Word Length {choice!r}")
+                continue
+
+            choice = int(choice)
+            if not word_min <= choice <= word_max:
+                print(f"Invalid Word Length {choice!r}")
+                continue
+
+            word_length = choice
+            break
+
     # Ask for naive, if not all words
-    if not WORDLE_IS_ALL_WORDS.get(context_id, False):
+    if not WORDLE_CONTEXTS_IS_ALL_WORDS.get(context_id, False):
         naive = input("Naive Mode?: ").strip() == "y"
     else:
         naive = False
 
-    return Context(context_id, naive)
+    return Context(context_id, naive, word_length)
 
 class Context:
     """Context to control details of a Wordle game."""
     letters = "abcdefghijklmnopqrstuvwxyz"
-    word_length = 5
 
-    def __init__(self, context_id, naive):
+    def __init__(self, context_id, naive = False, word_length = None):
+        """Create context to descript a wordle game.
+        If word length is None, word length is infered from context.
+        """
         self.context_id = context_id
+
+        # Naive is only valid if word list is not all words
+        if naive and context_id in WORDLE_CONTEXTS_IS_ALL_WORDS:
+            raise ValueError("Naive is not valid for all words context")
+
         self.naive = naive
+
+        if word_length is None:
+            # Try to infer word length
+            word_length = WORDLE_CONTEXTS_WORD_LENGTHS.get(context_id, 5)
+            if not isinstance(word_length, int):
+                raise ValueError(f"Unable to infer word length for context {context_id}")
+
+        self.word_length = word_length
+
         self._solutions = None
         self._word_list = None
         self._guesses = None
@@ -105,10 +143,10 @@ class Context:
 
     def _load_word_list_solutions(self):
         # Check if word list exists
-        word_list_file = os.path.join(
-            WORDLE_CACHE, WORDLE_WORD_LIST_FILE_FORMAT.format(self.context_id))
-        solutions_file = os.path.join(
-            WORDLE_CACHE, WORDLE_SOLUTIONS_FILE_FORMAT.format(self.context_id))
+        word_list_file = os.path.join(WORDLE_CACHE, WORDLE_WORD_LIST_FILE_FORMAT.format(
+            context_id = self.context_id))
+        solutions_file = os.path.join(WORDLE_CACHE, WORDLE_SOLUTIONS_FILE_FORMAT.format(
+            context_id = self.context_id))
 
         if os.path.isfile(word_list_file) and os.path.isfile(solutions_file):
             # Cache is present, load from cache
@@ -141,8 +179,9 @@ class Context:
             save_words(word_list, word_list_file)
             save_words(solutions, solutions_file)
 
-        self._word_list = word_list
-        self._solutions = solutions
+        # Restrict word list and solutions to only words that match word length
+        self._word_list = [word for word in word_list if len(word) == self.word_length]
+        self._solutions = [word for word in solutions if len(word) == self.word_length]
 
     @property
     def word_list(self):
@@ -165,31 +204,26 @@ class Context:
         else:
             return self._solutions.copy()
 
-    def _load_guesses(self):
-        """Get the initial best guess for this context."""
-        if self.naive:
-            guesses_filename = WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(self.context_id)
-        else:
-            guesses_filename = WORDLE_SMART_GUESSES_FILE_FORMAT.format(self.context_id)
+    def _get_guesses_filename(self):
+        naive_str = "naive" if self.naive else "smart"
+        guesses_filename = WORDLE_GUESSES_FILE_FORMAT.format(
+            naive = naive_str, context_id = self.context_id, word_length = self.word_length)
 
         guesses_filename = os.path.join(WORDLE_CACHE, guesses_filename)
+        return guesses_filename
 
+    def _load_guesses(self):
+        """Get the initial best guess for this context."""
         # If opening file fails, silently fail to indicate results invalid
         try:
-            with open(guesses_filename) as f:
+            with open(self._get_guesses_filename()) as f:
                 return json.load(f)
         except FileNotFoundError:
             pass
 
     def _save_guesses(self, guesses):
         """Set the initial best guess for this context."""
-        if self.naive:
-            guesses_filename = WORDLE_NAIVE_GUESSES_FILE_FORMAT.format(self.context_id)
-        else:
-            guesses_filename = WORDLE_SMART_GUESSES_FILE_FORMAT.format(self.context_id)
-
-        guesses_filename = os.path.join(WORDLE_CACHE, guesses_filename)
-        with open(guesses_filename, "w") as f:
+        with open(self._get_guesses_filename(), "w") as f:
             json.dump(guesses, f)
 
     def get_initial_guesses(self):

@@ -24,9 +24,6 @@ def check_word_list_solutions(word_list, solutions, context):
         words = solutions
 
     for word in words:
-        if len(word) != context.word_length:
-            raise ValueError(f"{word!r} is not {context.word_length} letters: ")
-
         for c in word:
             if c not in context.letters:
                 raise ValueError(f"{word!r} has illegal letter {c!r}")
@@ -104,27 +101,44 @@ WORDLEGAME_WORD_LIST_URL = "https://wordlegame.org/files/wordle/en/dictionary.js
 WORDLEGAME_SOLUTIONS_URL = "https://wordlegame.org/files/wordle/en/targets.json" # September 2022, v39.67
 # WORDLEGAME_SOLUTIONS_CRIB = '"cigar","rebut","sissy",' # February, 2023, Solutions are present, but not the start of the array
 
+# Diacritics from https://wordlegame.org/files/wordle/en/config.json?v42.11
+WORDLE_GAME_DIACRITICS = {}
+
+# Format to avoid unicode in source
+for letter, diacritics in {
+    'a': '\xe0\xe1\xe2\xe3\xe4\xe5',
+    'c': '\xe7',
+    'e': '\xe8\xe9\xea\xeb',
+    'i': '\xec\xed\xee\xef',
+    'n': '\xf1',
+    'o': '\xf2\xf3\xf4\xf5\xf6',
+    'u': '\xf9\xfa\xfb\xfc',
+    'y': '\xfd\xff'}.items():
+    for diacritic in diacritics:
+        WORDLE_GAME_DIACRITICS[diacritic] = letter
+
+del letter, diacritic, diacritics
+
+def wordle_game_internal(url):
+    # Despite marked with utf-8 encoding, wordlegame.org seems
+    # to *sometimes* actually encoded utf-8-sig
+    r = requests.get(url)
+    r.encoding = r.apparent_encoding
+    raw_word_list = r.json()
+
+    # Remove diacritics
+    word_list = []
+    for word in raw_word_list:
+        word = "".join([WORDLE_GAME_DIACRITICS.get(c, c) for c in word])
+        word_list.append(word)
+
+    return word_list
+
 def scrap_wordlegame():
     # wordlegame.org separates solutions and word lists into json, so they are
     # much easier to parse
-
-    # wordlegame.org's solutions and word lists contain values for other than
-    # 5 letters. This is because wordlegame.org supports variants for other
-    # word sizes. This currently only supports 5 letters, so remove the other words
-
-    # Despite marked with utf-8 encoding, wordlegame.org seems
-    # to *sometimes* actually encoded utf-8-sig
-    r = requests.get(WORDLEGAME_WORD_LIST_URL)
-    r.encoding = r.apparent_encoding
-    word_list = r.json()
-    word_list = [word for word in word_list if len(word) == 5]
-
-    # Despite marked with utf-8 encoding, wordlegame.org seems
-    # to *sometimes* actually encode utf-8-sig
-    r = requests.get(WORDLEGAME_SOLUTIONS_URL)
-    r.encoding = r.apparent_encoding
-    solutions = r.json()
-    solutions = [word for word in solutions if len(word) == 5]
+    word_list = wordle_game_internal(WORDLEGAME_WORD_LIST_URL)
+    solutions = wordle_game_internal(WORDLEGAME_SOLUTIONS_URL)
 
     # Known duplicates that need to be removed
     word_list = list(set(word_list))
@@ -178,28 +192,8 @@ WORDLEWEBSITE_UNLIMITED_SOLUTIONS_URL = "https://wordlewebsite.com/game/hurdleun
 def scrap_wordlewebsite_unlimited():
     # wordlegame.org separates solutions and word lists into json, so they are
     # much easier to parse
-
-    # wordlegame.org's solutions and word lists contain values for other than
-    # 5 letters. This is because wordlegame.org supports variants for other
-    # word sizes. This currently only supports 5 letters, so remove the other words
-
-    # Despite marked with utf-8 encoding, wordlegame.org seems
-    # to *sometimes* actually encoded utf-8-sig
-    r = requests.get(WORDLEWEBSITE_UNLIMITED_WORD_LIST_URL)
-    r.encoding = r.apparent_encoding
-    word_list = r.json()
-    word_list = [word for word in word_list if len(word) == 5]
-
-    # Despite marked with utf-8 encoding, wordlegame.org seems
-    # to *sometimes* actually encoded utf-8-sig
-    r = requests.get(WORDLEWEBSITE_UNLIMITED_SOLUTIONS_URL)
-    r.encoding = r.apparent_encoding
-    solutions = r.json()
-    solutions = [word for word in solutions if len(word) == 5]
-
-    # Known duplicates that need to be removed
-    word_list = list(set(word_list))
-    solutions = list(set(solutions))
+    word_list = wordle_game_internal(WORDLEWEBSITE_UNLIMITED_WORD_LIST_URL)
+    solutions = wordle_game_internal(WORDLEWEBSITE_UNLIMITED_SOLUTIONS_URL)
     return word_list, solutions
 
 ABSURDLE_URL = "https://qntm.org/files/absurdle/absurdle.html"
