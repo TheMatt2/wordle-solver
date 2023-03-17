@@ -200,7 +200,7 @@ class Context:
         # Check solutions first
         self._check_words(solutions)
 
-        if word_list != [ALL_WORDS_TOKEN]:
+        if word_list != set([ALL_WORDS_TOKEN]):
             self._check_words(word_list)
 
             # Check that all solutions are in word list
