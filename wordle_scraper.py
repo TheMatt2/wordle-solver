@@ -10,36 +10,9 @@ Two Wordle Games are currently supported:
 import json
 import hjson
 import requests
-import itertools
 import urllib.parse
 
 from wordle_contexts import ALL_WORDS_TOKEN
-
-def check_word_list_solutions(word_list, solutions, context):
-    # Verify solution and word lists make sense
-    if word_list != ALL_WORDS_TOKEN:
-        words = itertools.chain(solutions, word_list)
-    else:
-        # Don't bother checking word list
-        words = solutions
-
-    for word in words:
-        for c in word:
-            if c not in context.letters:
-                raise ValueError(f"{word!r} has illegal letter {c!r}")
-
-    # There should be no duplicates
-    solutions_set = set(solutions)
-    if len(solutions) != len(solutions_set):
-        raise ValueError("Solutions contains duplicate words")
-
-    if word_list != ALL_WORDS_TOKEN:
-        word_list_set = set(word_list)
-        if len(word_list) != len(word_list_set):
-            raise ValueError("Word list contains duplicate words")
-
-        if not word_list_set.issuperset(solutions_set):
-            raise ValueError("Not all solutions are in word list")
 
 NYTIMES_WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
 NYTIMES_WORDLE_JS_CRIB = 'src="https://www.nytimes.com/games-assets/v2/wordle.'
@@ -269,4 +242,4 @@ def scrap_flappy_birdle():
 
     # Birdle word list is all possible words
     # Use magic token to indicate all words
-    return ALL_WORDS_TOKEN, solutions
+    return [ALL_WORDS_TOKEN], solutions

@@ -15,10 +15,12 @@ import wordle_contexts
 from wordle_utils import progress_bar
 
 def main():
+    # Select Game Context
     context = wordle_contexts.ask_context()
 
-    print(f"Word list has {len(context.word_list)} words.")
-    print(f"There are {len(context.solutions)} possible solutions.")
+    # Print some stats
+    print(f"There are {len(context.get_guess_group())} possible guesses.")
+    print(f"There are {len(context.get_solution_group())} possible solutions.")
 
     # Make sure initial guess is generated
     context.get_initial_guesses()
@@ -29,7 +31,7 @@ def _wordle_test_mp(solution, context, progress = False, mp = False):
     return solution, turns
 
 def benchmark(context, mp = True):
-    solutions = context.solutions
+    solutions = context.get_solutions()
 
     random.seed(12345)
     random.shuffle(solutions)

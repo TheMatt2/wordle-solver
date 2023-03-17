@@ -49,14 +49,15 @@ def is_result(result, context):
 
     return True
 
-def ask_word(word_list, context):
+def ask_word(context):
+    """Ask use for a word to guess."""
     while True:
         word = input("Word: ").strip()
 
         if len(word) != context.word_length:
             print(f"{word!r} is not {context.word_length} letters. Please enter word again.")
 
-        elif word not in word_list:
+        elif not context.is_valid_word(word):
             if input(
                 f"{word!r} is not in the word list. Use this word anyway? (y/n): "
                 ).strip() == "y":
@@ -87,15 +88,14 @@ def ask_result(word, context):
     return result
 
 def main():
-    # Select Word List
+    # Select Game Context
     context = wordle_contexts.ask_context()
 
-    # Get the word list to check words against
-    word_list = context.word_list
+    # Get word groups
     guess_group = context.get_guess_group()
     solution_group = context.get_solution_group()
 
-    print(f"Word list has {len(word_list)} words.")
+    print(f"There are {len(guess_group)} possible guesses.")
     print(f"There are {len(solution_group)} possible solutions.")
 
     guesses = context.get_initial_guesses()
@@ -112,7 +112,7 @@ def main():
     print(f"rank: {rank:.4f} worst case: {foil}")
 
     while True:
-        word = ask_word(word_list, context)
+        word = ask_word(context)
         result = ask_result(word, context)
 
         if result == "g" * context.word_length:
@@ -136,7 +136,7 @@ def main():
 
             print(f"Best Next Guess: {guess} ({foil})")
             print(f"Failing Guess: {guess_b} ({foil_b})")
-            del guess_b, foil_b
+            del guess_b, foil_b # avoid namespace pollution
             continue
 
         if len(solution_group) == 1:

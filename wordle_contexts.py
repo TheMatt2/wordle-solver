@@ -48,15 +48,10 @@ def load_words(filename):
         return words
 
 def save_words(words, filename):
-    if words == ALL_WORDS_TOKEN:
-        with open(filename, "w") as f:
-            f.write(f"{ALL_WORDS_TOKEN}\n")
-    else:
-        # Save words normally
-        words.sort()
-        with open(filename, "w") as f:
-            for word in words:
-                f.write(f"{word}\n")
+    words.sort()
+    with open(filename, "w") as f:
+        for word in words:
+            f.write(f"{word}\n")
 
 def ask_context():
     print("Please select a Wordle Version to use:")
@@ -133,9 +128,8 @@ class Context:
 
         self.word_length = word_length
 
-        self._solutions = None
         self._word_list = None
-        self._guesses = None
+        self._solutions = None
 
     @property
     def name(self):
@@ -143,34 +137,30 @@ class Context:
 
     def _load_word_list_solutions(self):
         # Check if word list exists
-        word_list_file = os.path.join(WORDLE_CACHE, WORDLE_WORD_LIST_FILE_FORMAT.format(
-            context_id = self.context_id))
-        solutions_file = os.path.join(WORDLE_CACHE, WORDLE_SOLUTIONS_FILE_FORMAT.format(
-            context_id = self.context_id))
+        word_list_file = WORDLE_WORD_LIST_FILE_FORMAT.format(context_id = self.context_id)
+        solutions_file = WORDLE_SOLUTIONS_FILE_FORMAT.format(context_id = self.context_id)
+
+        word_list_file = os.path.join(WORDLE_CACHE, word_list_file)
+        solutions_file = os.path.join(WORDLE_CACHE, solutions_file)
 
         if os.path.isfile(word_list_file) and os.path.isfile(solutions_file):
             # Cache is present, load from cache
             word_list = load_words(word_list_file)
             solutions = load_words(solutions_file)
 
-            if word_list == [ALL_WORDS_TOKEN]:
-                word_list = ALL_WORDS_TOKEN
-
             # Verify results are valid
-            wordle_scraper.check_word_list_solutions(word_list, solutions, self)
-            solutions.sort()
-            if word_list != ALL_WORDS_TOKEN:
-                word_list.sort()
+            self._check_word_list_solutions(word_list, solutions)
         else:
             # Get results from internet
             print("Getting solutions and word list from internet.")
             word_list, solutions = WORDLE_CONTEXTS_SCRAPER[self.context_id]()
 
-            # Verify results are valid
-            wordle_scraper.check_word_list_solutions(word_list, solutions, self)
-            solutions.sort()
-            if word_list != ALL_WORDS_TOKEN:
+            # Verify words are valid
+            self._check_word_list_solutions(word_list, solutions)
+
+            if word_list != [ALL_WORDS_TOKEN]:
                 word_list.sort()
+            solutions.sort()
 
             # Save results to cache
             if not os.path.exists(WORDLE_CACHE):
@@ -180,29 +170,42 @@ class Context:
             save_words(solutions, solutions_file)
 
         # Restrict word list and solutions to only words that match word length
-        self._word_list = [word for word in word_list if len(word) == self.word_length]
-        self._solutions = [word for word in solutions if len(word) == self.word_length]
+        if word_list != [ALL_WORDS_TOKEN]:
+            word_list = [word for word in word_list if len(word) == self.word_length]
+        self._word_list = word_list
 
-    @property
-    def word_list(self):
-        if self._word_list is None:
-            self._load_word_list_solutions()
+        solutions = [word for word in solutions if len(word) == self.word_length]
+        self._solutions = solutions
 
-        if self._word_list == ALL_WORDS_TOKEN:
-            return AllWordsWordList(self)
+    def _check_words(self, words):
+        # Verify words are the character set
+        for word in words:
+            for c in word:
+                if c not in self.letters:
+                    raise ValueError(f"{word!r} has illegal letter {c!r}")
 
-        return self._word_list.copy()
+    def _check_word_list_solutions(self, word_list, solutions):
+        # Verify solution and word lists make sense
+        # Make into sets and check lengths
+        word_list_count = len(word_list)
+        word_list = set(word_list)
+        if len(word_list) != word_list_count:
+            raise ValueError("Word list contains duplicate words")
 
-    @property
-    def solutions(self):
-        if self._solutions is None:
-            self._load_word_list_solutions()
+        solutions_count = len(solutions)
+        solutions = set(solutions)
+        if len(solutions) != solutions_count:
+            raise ValueError("Solutions contain duplicate words")
 
-        if self.naive:
-            # In naive mode, solutions are all words
-            return self.word_list.copy()
-        else:
-            return self._solutions.copy()
+        # Check solutions first
+        self._check_words(solutions)
+
+        if word_list != [ALL_WORDS_TOKEN]:
+            self._check_words(word_list)
+
+            # Check that all solutions are in word list
+            if not word_list.issuperset(solutions):
+                raise ValueError("Not all solutions are in word list")
 
     def _get_guesses_filename(self):
         naive_str = "naive" if self.naive else "smart"
@@ -228,9 +231,6 @@ class Context:
 
     def get_initial_guesses(self):
         """Get the initial best guess for this context."""
-        if self._guesses is not None:
-            return guesses
-
         guesses = self._load_guesses()
         if not guesses:
             # Generate initial guesses
@@ -242,22 +242,39 @@ class Context:
 
         return guesses
 
+    def get_word_list(self):
+        if self._word_list is None:
+            self._load_word_list_solutions()
+        return self._word_list.copy()
+
+    def get_solutions(self):
+        if self._solutions is None:
+            self._load_word_list_solutions()
+
+        if self.naive:
+            return self._word_list.copy()
+        else:
+            return self._solutions.copy()
+
     def get_guess_group(self):
-        if self.word_list == ALL_WORDS_TOKEN:
+        if self._word_list is None:
+            self._load_word_list_solutions()
+
+        if self._word_list == [ALL_WORDS_TOKEN]:
             return wordle_solver.AllWordsGuessGroup(self)
         else:
-            return wordle_solver.GuessGroup(self.word_list, self)
+            return wordle_solver.GuessGroup(self._word_list, self)
 
     def get_solution_group(self):
-        return wordle_solver.SolutionGroup(self.solutions, self)
+        if self._solutions is None:
+            self._load_word_list_solutions()
 
-class AllWordsWordList:
-    """Special optimized object to represent all possible words are valid."""
-    def __init__(self, context):
-        self.context = context
+        if self.naive:
+            return wordle_solver.SolutionGroup(self._word_list, self)
+        else:
+            return wordle_solver.SolutionGroup(self._solutions, self)
 
-    def __len__(self):
-        return len(self.context.letters) ** self.context.word_length
-
-    def __contains__(self, word):
-        return len(word) == self.context.word_length
+    def is_valid_word(self, word):
+        if self._word_list is None:
+            self._load_word_list_solutions()
+        return word in self._word_list
