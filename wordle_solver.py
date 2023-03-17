@@ -490,6 +490,11 @@ def filter_guesses(guess_group, solution_group, progress = True):
             f"{len(guess_group)} in {stop - start:.4f} secs")
 
 def best_guesses(guess_group, solution_group, progress = True, mp = True):
+    """Generate the best guesses for the words and solutions."""
+    if mp and len(guess_group) * len(solution_group) < 60000:
+        # Multiprocessing is not worth it for small problems
+        mp = False
+
     # Find the best next word
     best_rank = None
     best_guesses = None
@@ -565,7 +570,7 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
         # Use single process
         nonsolution_start = len(guess_solution_list)
         for i, guess in enumerate(progress_bar(itertools.chain(guess_solution_list, guess_nonsolution_list),
-                persist = progress, enabled = progress is not False)):
+                len(guess_group), persist = progress, enabled = progress is not False)):
 
             rank, foil = solution_group.guess_rank(guess)
 
