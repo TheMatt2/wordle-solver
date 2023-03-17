@@ -150,17 +150,13 @@ class WordGroup(BaseWordGroup):
 
     @property
     def excluded_letters(self):
-        """Check which letters that can not be part of the solution"""
-        # Inefficient method, but seems fast enough
-        included_letters = set()
-        for word in self:
-            included_letters.update(word)
-            if len(included_letters) == len(self.context.letters):
-                # All letters are present
-                assert included_letters == set(self.context.letters)
-                break
-
-        excluded_letters = included_letters.symmetric_difference(self.context.letters)
+        """Check which letters never appear in the word group"""
+        # Calculate excluded letters using breakdown
+        self._prepare_stats()
+        excluded_letters = set()
+        for letter, word_set in self._word_contains.items():
+            if not len(word_set):
+                excluded_letters.add(letter)
         return excluded_letters
 
 class GuessGroup(WordGroup):
