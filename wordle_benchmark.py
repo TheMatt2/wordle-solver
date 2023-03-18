@@ -23,7 +23,7 @@ def main():
     print(f"There are {len(context.get_solution_group())} possible solutions.")
 
     # Make sure initial guess is generated
-    context.get_initial_guesses()
+    context.load_guesses()
     benchmark(context)
 
 def _wordle_test_mp(solution, context, progress = False, mp = False):
@@ -52,8 +52,7 @@ def benchmark(context, mp = True):
 
             with concurrent.futures.ProcessPoolExecutor(mp) as executor:
                 for solution, turns in progress_bar(executor.map(
-                        partial(_wordle_test_mp, context = context),
-                        solutions), len(solutions)):
+                        partial(_wordle_test_mp, context = context), solutions), len(solutions)):
 
                     turn_count += 1
                     turn_total += turns

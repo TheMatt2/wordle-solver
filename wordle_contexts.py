@@ -3,6 +3,7 @@ wordle_contexts.py
 """
 import os
 import hjson
+import filelock
 
 ALL_WORDS_TOKEN = "ALL_WORDS_ARE_VALID_GUESSES"
 
@@ -103,6 +104,23 @@ def ask_context():
         naive = False
 
     return Context(context_id, naive, word_length)
+
+def get_all_contexts():
+    """Generate all supported contexts."""
+    for context_id in WORDLE_CONTEXT_IDS:
+        for naive in [False, True]:
+            if naive and WORDLE_CONTEXTS_IS_ALL_WORDS.get(context_id):
+                # All words can not be naive
+                continue
+
+            length = WORDLE_CONTEXTS_WORD_LENGTHS.get(context_id, 5)
+            if not isinstance(length, int):
+                # Multiple lengths
+                min_length, max_length = length
+                for length in range(min_length, max_length):
+                    yield Context(context_id, naive, length)
+            else:
+                yield Context(context_id, naive, length)
 
 class Context:
     """Context to control details of a Wordle game."""
@@ -247,7 +265,8 @@ class Context:
     def load_guesses(self):
         """Get the best guess for this turn."""
         # Return cache data, for the particular words guessed
-        self._load_guess_data()
+        with filelock.FileLock(f"{self._guesses_filename()}.lck", timeout = 1):
+            self._load_guess_data()
 
         cache_data = self._cache_data
         for word, result in self._words_guessed:
@@ -280,24 +299,27 @@ class Context:
         if len(self._words_guessed) > 1:
             return
 
-        cache_data = self._cache_data
-        for word, result in self._words_guessed:
-            # Attempt to traverse to the point in the cache
-            # with guess for these series of words
-            if word in cache_data:
-                cache_data = cache_data[word].setdefault("next_turn", {}).setdefault(result, {})
-            else:
-                return
+        # Make sure cache is loaded, use file lock to prevent collisions
+        with filelock.FileLock(f"{self._guesses_filename()}.lck", timeout = 1):
+            self._load_guess_data()
+            cache_data = self._cache_data
+            for word, result in self._words_guessed:
+                # Attempt to traverse to the point in the cache
+                # with guess for these series of words
+                if word in cache_data:
+                    cache_data = cache_data[word].setdefault("next_turn", {}).setdefault(result, {})
+                else:
+                    return
 
-        # Add guesses to cache (replacing existing)
-        cache_data.clear()
-        for guess, foil in zip(guesses, foils):
-            cache_data[guess] = {
-                "rank": rank,
-                "foil": foil,
-            }
+            # Add guesses to cache (replacing existing)
+            cache_data.clear()
+            for guess, foil in zip(guesses, foils):
+                cache_data[guess] = {
+                    "rank": rank,
+                    "foil": foil,
+                }
 
-        self._save_guess_data()
+            self._save_guess_data()
 
     def get_word_list(self):
         if self._word_list is None:
