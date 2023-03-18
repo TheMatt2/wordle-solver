@@ -242,7 +242,7 @@ class Context:
 
     def _save_guess_data(self):
         with open(self._guesses_filename(), "w") as f:
-            hjson.dumpJSON(self._cache_data, f)
+            hjson.dumpJSON(self._cache_data, f, indent = "\t")
 
     def load_guesses(self):
         """Get the best guess for this turn."""

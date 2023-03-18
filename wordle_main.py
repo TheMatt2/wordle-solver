@@ -95,7 +95,7 @@ def main():
     guess, foil = min(zip(guesses, foils))
     print(f"Best starting word: {guess}")
     print("Words Remaining:", len(solution_group))
-    print(f"rank: {rank:.4f} worst case: {foil}")
+    print(f"Rank: {rank:.4f} Worst Case: {foil}")
 
     while True:
         word = ask_word(context)
