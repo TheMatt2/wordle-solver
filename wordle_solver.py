@@ -6,7 +6,8 @@ import math
 import concurrent.futures
 from multiprocessing import cpu_count
 
-from wordle_utils import progress_bar, ProgressBarMP, wait_exception_or_completed, chunked
+from wordle_utils import progress_bar, ProgressBarMP, \
+    wait_exception_or_completed, chunked, filter_blacklist
 
 class BaseWordGroup(metaclass = ABCMeta):
     """
@@ -526,31 +527,45 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True, cache 
                 enabled = progress is not False) as progress_bar_mp, \
                 concurrent.futures.ProcessPoolExecutor(mp) as executor:
 
-                # Process for each batch
-                fs = []
-                for guess_chunk in chunked(guess_group, mp):
-                    future = executor.submit(solution_group._guess_rank_mp,
-                        progress_bar_mp.worker_loop(guess_chunk))
-                    fs.append(future)
+                for guess_list in [solution_group, filter_blacklist(guess_group, solution_group)]:
+                    if not guess_list:
+                        # On the chance all guesses are solutions
+                        # There *must* be guesses that are solutions
+                        assert best_rank is not None, "No guesses that are solutions found"
+                        continue
 
-                progress_bar_mp.parent_loop(lambda x: wait_exception_or_completed(fs, x))
+                    # Process for each batch
+                    fs = []
+                    for guess_chunk in chunked(guess_list, mp):
+                        future = executor.submit(solution_group._guess_rank_mp,
+                            progress_bar_mp.worker_loop(guess_chunk))
+                        fs.append(future)
 
-                for future in fs:
-                    rank, guesses, foils = future.result()
+                    progress_bar_mp.parent_loop(lambda x: wait_exception_or_completed(fs, x))
 
-                    if not best_rank or rank < best_rank:
-                        best_rank = rank
-                        best_guesses = guesses
-                        best_foils = foils
+                    for future in fs:
+                        rank, guesses, foils = future.result()
 
-                    elif rank == best_rank:
-                        best_guesses.extend(guesses)
-                        best_foils.extend(foils)
+                        if not best_rank or rank < best_rank:
+                            best_rank = rank
+                            best_guesses = guesses
+                            best_foils = foils
+
+                        elif rank == best_rank:
+                            best_guesses.extend(guesses)
+                            best_foils.extend(foils)
+
+                    # No need to continue processing if rank is < 2
+                    if best_rank < 2:
+                        progress_bar_mp.complete()
+                        break
 
     else:
         # Use single process
-        for guess in progress_bar(guess_group, persist = progress,
-                enabled = progress is not False):
+        nonsolution_start = len(solution_group)
+        for i, guess in progress_bar(
+                itertools.chain(solution_group, filter_blacklist(guess_group, solution_group)),
+                len(guess_group), persist = progress, enabled = progress is not False):
 
             rank, foil = solution_group.guess_rank(guess)
 
@@ -562,6 +577,10 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True, cache 
             elif rank == best_rank:
                 best_guesses.append(guess)
                 best_foils.append(foil)
+
+            # No need to continue processing if rank is < 2
+            if i + 1 == nonsolution_start and best_rank < 2:
+                break
 
     # If a guess is in the solution set, that actually makes it
     # better than any other option. Filter down to only guesses in solutions

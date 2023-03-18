@@ -387,3 +387,31 @@ def chunked(iterable, n):
         # Use islice to create the iterables
         children = itertools.tee(iterable, n)
         return [itertools.islice(it, index, None, n) for index, it in enumerate(children)]
+
+class filter_blacklist:
+    """
+    generator to filter out items in a blacklist
+    Assumes that all members of the blacklist will occur once.
+    Special case to help with handling solution processing.
+    """
+    # A class so it can be pickled midstate, and provide a custom length
+    def __init__(self, iterable, blacklist):
+        self.length = len(iterable) - len(blacklist)
+
+        self.iterable = iter(iterable)
+        self.blacklist = blacklist
+
+    def __len__(self):
+        return self.length
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self.next()
+
+    def next(self):
+        while True:
+            item = next(self.iterable)
+            if item not in self.blacklist:
+                return item
