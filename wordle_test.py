@@ -78,41 +78,8 @@ def wordle_test(solution, context, progress = True, mp = True):
     guess_group = context.get_guess_group()
     solution_group = context.get_solution_group()
 
-    # "guesses" is the initial guess for this Wordle game
-    # without knowing any information specific to this game
-    guesses = context.get_initial_guesses()
-    guess = min(guesses)
-    turns = 0
     start = time.perf_counter()
     while True:
-        # If no solution, use foil
-        if solution:
-            result = wordle_result(guess, solution, context)
-        else:
-            rank, result = solution_group.guess_rank(guess)
-
-        if progress:
-            print(wordle_coloring(guess, result))
-
-        turns += 1 # Number of turns to find solution
-
-        if result == "g" * context.word_length:
-            if not solution:
-                solution = guess
-
-            if progress:
-                print("Success!")
-
-            break
-
-        # Find number of words remaining
-        # Track prior count to see if solutions were removed
-        solution_count = len(solution_group)
-        solution_group.filter_solutions(guess, result)
-
-        # Make sure solutions were removed
-        assert len(solution_group) < solution_count, f"No solutions eliminated for guess {guess}"
-
         if  1 <= len(solution_group) <= 2:
             # Only two or less words
             # Best guess is either of the words
@@ -126,13 +93,43 @@ def wordle_test(solution, context, progress = True, mp = True):
                 guess_group, solution_group, progress = None if progress else False, mp = mp)
             guess = min(guesses)
 
+        # If no solution, use foil
+        if solution:
+            result = wordle_result(guess, solution, context)
+        else:
+            rank, result = solution_group.guess_rank(guess)
+
+        if progress:
+            print(wordle_coloring(guess, result))
+
+        # Add word result to context
+        context.next_turn(guess, result)
+
+        if result == "g" * context.word_length:
+            if not solution:
+                solution = guess
+
+            if progress:
+                print("Success!")
+            break
+
+        # Find number of words remaining
+        # Track prior count to see if solutions were removed
+        solution_count = len(solution_group)
+        solution_group.filter_solutions(guess, result)
+
+        # Make sure solutions were removed
+        assert len(solution_group) < solution_count, f"No solutions eliminated for guess {guess!r}"
+
     stop = time.perf_counter()
 
     if progress:
         print(
             f"Test: {context.name} Naive: {context.naive} "
-            f"Solution: {solution} Turns: {turns} Duration: {stop - start:.4f} secs\n")
+            f"Solution: {solution} Turns: {context.turns} Duration: {stop - start:.4f} secs\n")
 
+    turns = context.turns
+    context.reset()
     return turns
 
 def main():

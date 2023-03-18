@@ -2,7 +2,7 @@
 wordle_contexts.py
 """
 import os
-import json
+import hjson
 
 ALL_WORDS_TOKEN = "ALL_WORDS_ARE_VALID_GUESSES"
 
@@ -131,9 +131,25 @@ class Context:
         self._word_list = None
         self._solutions = None
 
+        # Track for loading and saving to cache
+        self._words_guessed = []
+        self._cache_data = None
+
+    def reset(self):
+        """Reset the turn of the context."""
+        self._words_guessed = []
+
+    def next_turn(self, word, result):
+        """Add a word and result to move to next turn."""
+        self._words_guessed.append((word, result))
+
     @property
     def name(self):
         return WORDLE_CONTEXTS_NAME[self.context_id]
+
+    @property
+    def turns(self):
+        return len(self._words_guessed)
 
     def _load_word_list_solutions(self):
         # Check if word list exists
@@ -207,7 +223,7 @@ class Context:
             if not word_list.issuperset(solutions):
                 raise ValueError("Not all solutions are in word list")
 
-    def _get_guesses_filename(self):
+    def _guesses_filename(self):
         naive_str = "naive" if self.naive else "smart"
         guesses_filename = WORDLE_GUESSES_FILE_FORMAT.format(
             naive = naive_str, context_id = self.context_id, word_length = self.word_length)
@@ -215,32 +231,73 @@ class Context:
         guesses_filename = os.path.join(WORDLE_CACHE, guesses_filename)
         return guesses_filename
 
-    def _load_guesses(self):
-        """Get the initial best guess for this context."""
-        # If opening file fails, silently fail to indicate results invalid
-        try:
-            with open(self._get_guesses_filename()) as f:
-                return json.load(f)
-        except FileNotFoundError:
-            pass
+    def _load_guess_data(self):
+         if self._cache_data is None:
+            # Try to load cache
+            try:
+                with open(self._guesses_filename()) as f:
+                    self._cache_data = hjson.load(f)
+            except FileNotFoundError:
+                self._cache_data = {}
 
-    def _save_guesses(self, guesses):
-        """Set the initial best guess for this context."""
-        with open(self._get_guesses_filename(), "w") as f:
-            json.dump(guesses, f)
+    def _save_guess_data(self):
+        with open(self._guesses_filename(), "w") as f:
+            hjson.dumpJSON(self._cache_data, f)
 
-    def get_initial_guesses(self):
-        """Get the initial best guess for this context."""
-        guesses = self._load_guesses()
-        if not guesses:
-            # Generate initial guesses
-            guess_group = self.get_guess_group()
-            solution_group = self.get_solution_group()
+    def load_guesses(self):
+        """Get the best guess for this turn."""
+        # Return cache data, for the particular words guessed
+        self._load_guess_data()
 
-            rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
-            self._save_guesses(guesses)
+        cache_data = self._cache_data
+        for word, result in self._words_guessed:
+            # Attempt to traverse to the point in the cache
+            # with guess for these series of words
+            try:
+                cache_data = cache_data[word]["next_turn"][result]
+            except KeyError:
+                return None, [], []
 
-        return guesses
+        # Use guesses if present
+        rank = None
+        guesses = []
+        foils = []
+        for guess, data in cache_data.items():
+            if rank is None:
+                rank = data["rank"]
+            else:
+                if rank != data["rank"]:
+                    raise ValueError("Guesses have different ranks")
+
+            guesses.append(guess)
+            foils.append(data["foil"])
+
+        return rank, guesses, foils
+
+    def save_guesses(self, rank, guesses, foils):
+        """Save guesses into the cache."""
+        # Do not save guesses further than 1 turn
+        if len(self._words_guessed) > 1:
+            return
+
+        cache_data = self._cache_data
+        for word, result in self._words_guessed:
+            # Attempt to traverse to the point in the cache
+            # with guess for these series of words
+            if word in cache_data:
+                cache_data = cache_data[word].setdefault("next_turn", {}).setdefault(result, {})
+            else:
+                return
+
+        # Add guesses to cache (replacing existing)
+        cache_data.clear()
+        for guess, foil in zip(guesses, foils):
+            cache_data[guess] = {
+                "rank": rank,
+                "foil": foil,
+            }
+
+        self._save_guess_data()
 
     def get_word_list(self):
         if self._word_list is None:

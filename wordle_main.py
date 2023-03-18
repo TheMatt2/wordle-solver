@@ -12,15 +12,6 @@ import wordle_contexts
 #   - Rearrange solver hard mode for "all words" is less awkward
 #   - Explore a linear search, like what would be needed for "all words"
 #     may have a performance advantage
-#
-# - Support multiple word lengths
-#   - Add additional contexts
-#   - Cleanup frontend to support more contexts more
-#     elegantly
-#
-# - Add further cacheing of more than the first word.
-#   Don't cache everything, but cache all operations that take
-#   more than a set time limit.
 
 def print_first_solutions(solutions, count = 10):
     for solution in nsmallest(count, solutions):
@@ -98,12 +89,7 @@ def main():
     print(f"There are {len(guess_group)} possible guesses.")
     print(f"There are {len(solution_group)} possible solutions.")
 
-    guesses = context.get_initial_guesses()
-    # Calculate rank and foil for saved values
-    foils = []
-    for guess in guesses:
-        rank, foil = solution_group.guess_rank(guess)
-        foils.append(foil)
+    rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
 
     print_first_guesses(guesses, foils)
     guess, foil = min(zip(guesses, foils))
@@ -118,6 +104,9 @@ def main():
         if result == "g" * context.word_length:
             print("Success!")
             break
+
+        # Tell context word was guessed for cacheing to work
+        context.next_turn(word, result)
 
         # Find number of words remaining
         # Track prior count to see if solutions were removed
@@ -154,7 +143,6 @@ def main():
         if solution_count != len(solution_group):
             # Solutions changed, so update guesses
             rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
-            assert len(guesses) == len(foils)
             print_first_guesses(guesses, foils)
             guess, foil = min(zip(guesses, foils))
 

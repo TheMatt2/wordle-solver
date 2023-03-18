@@ -489,8 +489,18 @@ def filter_guesses(guess_group, solution_group, progress = True):
         print(f"Filtered {full_word_list_count} words down to "
             f"{len(guess_group)} in {stop - start:.4f} secs")
 
-def best_guesses(guess_group, solution_group, progress = True, mp = True):
+def best_guesses(guess_group, solution_group, progress = True, mp = True, cache = True):
     """Generate the best guesses for the words and solutions."""
+    if guess_group.context != solution_group.context:
+        raise ValueError("Guess and solution groups must have the same context")
+
+    if cache:
+        # Use context to check if results can be returned from the cache
+        context = guess_group.context
+        best_rank, best_guesses, best_foils = context.load_guesses()
+        if best_rank is not None:
+            return best_rank, best_guesses, best_foils
+
     if mp and len(guess_group) * len(solution_group) < 60000:
         # Multiprocessing is not worth it for small problems
         mp = False
@@ -571,4 +581,10 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
         print(f"Calculated Guesses in {stop - start:.3f} secs")
 
     assert len(best_guesses) == len(best_foils), "Number of guesses and foils do not match"
+
+    if cache:
+        # Add results to cache
+        context = guess_group.context
+        context.save_guesses(best_rank, best_guesses, best_foils)
+
     return best_rank, best_guesses, best_foils
