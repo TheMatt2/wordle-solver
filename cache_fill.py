@@ -14,7 +14,6 @@ def main():
         solution_group = context.get_solution_group()
 
         # Get initial guesses
-        wordle_solver.best_guesses(guess_group, solution_group)
         rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
         for guess in guesses:
             for result in solution_group.results:
@@ -36,7 +35,8 @@ def main():
                     context.reset()
                     continue
 
-                wordle_solver.best_guesses(guess_group, new_solution_group, progress = None)
+                new_guess_group = guess_group.copy()
+                wordle_solver.best_guesses(new_guess_group, new_solution_group, progress = None)
                 print("Cached")
                 context.reset()
 
