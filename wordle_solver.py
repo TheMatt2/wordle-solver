@@ -563,9 +563,9 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True, cache 
     else:
         # Use single process
         nonsolution_start = len(solution_group)
-        for i, guess in progress_bar(
+        for i, guess in enumerate(progress_bar(
                 itertools.chain(solution_group, filter_blacklist(guess_group, solution_group)),
-                len(guess_group), persist = progress, enabled = progress is not False):
+                len(guess_group), persist = progress, enabled = progress is not False)):
 
             rank, foil = solution_group.guess_rank(guess)
 
