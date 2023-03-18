@@ -4,6 +4,7 @@ time taken.
 """
 import sys
 import time
+import itertools
 import multiprocessing
 import concurrent.futures
 
@@ -361,3 +362,26 @@ class ProgressBarMP:
                 # Exited cleanly, but not complete
                 raise RuntimeError("Progress bar finished early at "
                                 f"{self.count_value.value} / {self.length}")
+
+def chunked(iterable, n):
+    """
+    Separate iterable into n chunks. If the iterable does not divide evenly,
+    some chunks will have one less item to make up for it.
+    If n is larger than the length of the iterable, less than n chunks will be
+    returned.
+    """
+    # Based on https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#distribute
+    if n < 1:
+        raise ValueError('n must be at least 1')
+
+    if len(iterable) < n:
+        n = len(iterable)
+
+    try:
+        # If iterable supports slicing, use that
+        # Slicing by steps [::n] seems to be faster
+        return [iterable[index::n] for index in range(n)]
+    except TypeError:
+        # Use islice to create the iterables
+        children = itertools.tee(iterable, n)
+        return [itertools.islice(it, index, None, n) for index, it in enumerate(children)]

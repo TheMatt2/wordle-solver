@@ -6,7 +6,7 @@ import math
 import concurrent.futures
 from multiprocessing import cpu_count
 
-from wordle_utils import progress_bar, ProgressBarMP, wait_exception_or_completed
+from wordle_utils import progress_bar, ProgressBarMP, wait_exception_or_completed, chunked
 
 class BaseWordGroup(metaclass = ABCMeta):
     """
@@ -507,16 +507,6 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
         mp = cpu_count()
 
     start = time.perf_counter()
-
-    # Split guess into words that are solutions and not
-    guess_solution_list = []
-    guess_nonsolution_list = []
-    for guess in guess_group:
-        if guess in solution_group:
-            guess_solution_list.append(guess)
-        else:
-            guess_nonsolution_list.append(guess)
-
     if mp:
         # Use multiprocessing to accelerate processing
         if progress:
@@ -526,23 +516,9 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
                 enabled = progress is not False) as progress_bar_mp, \
                 concurrent.futures.ProcessPoolExecutor(mp) as executor:
 
-            for guess_list in [guess_solution_list, guess_nonsolution_list]:
-                if not guess_list:
-                    # On the chance all guesses are solutions
-                    # There *must* be guesses that are solutions
-                    assert best_rank is not None, "No guesses that are solutions found"
-                    continue
-
-                chunksize = math.ceil(len(guess_list) / mp)
-
                 # Process for each batch
                 fs = []
-                for i in range(mp):
-                    guess_chunk = guess_list[chunksize * i: chunksize * (i + 1)]
-                    if not guess_chunk:
-                        # So few chunks, none to submit
-                        continue
-
+                for guess_chunk in chunked(guess_group, mp):
                     future = executor.submit(solution_group._guess_rank_mp,
                         progress_bar_mp.worker_loop(guess_chunk))
                     fs.append(future)
@@ -561,16 +537,10 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
                         best_guesses.extend(guesses)
                         best_foils.extend(foils)
 
-                # No need to continue processing if rank is < 2
-                if best_rank < 2:
-                    progress_bar_mp.complete()
-                    break
-
     else:
         # Use single process
-        nonsolution_start = len(guess_solution_list)
-        for i, guess in enumerate(progress_bar(itertools.chain(guess_solution_list, guess_nonsolution_list),
-                len(guess_group), persist = progress, enabled = progress is not False)):
+        for guess in progress_bar(guess_group, persist = progress,
+                enabled = progress is not False):
 
             rank, foil = solution_group.guess_rank(guess)
 
@@ -582,10 +552,6 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True):
             elif rank == best_rank:
                 best_guesses.append(guess)
                 best_foils.append(foil)
-
-            # No need to continue processing if rank is < 2
-            if i + 1 == nonsolution_start and best_rank < 2:
-                break
 
     # If a guess is in the solution set, that actually makes it
     # better than any other option. Filter down to only guesses in solutions
