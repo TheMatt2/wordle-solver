@@ -301,12 +301,12 @@ class ProgressBarMP:
         if wait_check(self.delay):
             return
 
+        # Get count, length
+        count = self.count_value.value
+
         # Start showing progress bar
         try:
             while True:
-                # Get count, length
-                count = self.count_value.value
-
                 # Stop if complete
                 if count >= self.length:
                     break
@@ -322,6 +322,8 @@ class ProgressBarMP:
                 if wait_check(self.delay):
                     count = self.count_value.value
                     break
+                else:
+                    count = self.count_value.value
         finally:
             # Clear progress up until now
             if self.progress_shown: self.file.write(clear_line())
