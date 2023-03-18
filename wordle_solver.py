@@ -494,14 +494,14 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True, cache 
     if guess_group.context != solution_group.context:
         raise ValueError("Guess and solution groups must have the same context")
 
+    context = guess_group.context
     if cache:
         # Use context to check if results can be returned from the cache
-        context = guess_group.context
         best_rank, best_guesses, best_foils = context.load_guesses()
         if best_rank is not None:
             return best_rank, best_guesses, best_foils
 
-    if mp and len(guess_group) * len(solution_group) < 60000:
+    if mp and context.word_length <= 5 and len(guess_group) * len(solution_group) < 60000:
         # Multiprocessing is not worth it for small problems
         mp = False
 
