@@ -167,6 +167,10 @@ def scrap_wordlewebsite_unlimited():
     # much easier to parse
     word_list = wordle_game_internal(WORDLEWEBSITE_UNLIMITED_WORD_LIST_URL)
     solutions = wordle_game_internal(WORDLEWEBSITE_UNLIMITED_SOLUTIONS_URL)
+
+    # Known duplicates that need to be removed
+    word_list = list(set(word_list))
+    solutions = list(set(solutions))
     return word_list, solutions
 
 ABSURDLE_URL = "https://qntm.org/files/absurdle/absurdle.html"
