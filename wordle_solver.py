@@ -245,7 +245,7 @@ class AllWordsGuessGroup(BaseWordGroup):
             yield "".join(word)
 
     def copy(self):
-        return self.__class__(self.excluded_letters)
+        return self.__class__(self.context, self.excluded_letters)
 
     def filter_guesses(self, excluded_letters):
         # Simplify save excluded letters
