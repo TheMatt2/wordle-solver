@@ -398,7 +398,7 @@ class filter_blacklist:
     def __init__(self, iterable, blacklist):
         self.length = len(iterable) - len(blacklist)
 
-        self.iterable = iter(iterable)
+        self.iterable = iterable
         self.blacklist = blacklist
 
     def __len__(self):
@@ -411,6 +411,9 @@ class filter_blacklist:
         return self.next()
 
     def next(self):
+        # Hack to make pickling happy for generators
+        # Better workaround would be to use PicklableGenerator()
+        self.iterable = iter(self.iterable)
         while True:
             item = next(self.iterable)
             if item not in self.blacklist:
