@@ -356,4 +356,7 @@ class Context:
     def is_valid_word(self, word):
         if self._word_list is None:
             self._load_word_list_solutions()
+
+        if self._word_list == [ALL_WORDS_TOKEN]:
+            return len(word) == self.word_length
         return word in self._word_list
