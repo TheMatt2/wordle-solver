@@ -18,7 +18,6 @@ def main():
         rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group, mp = mp)
         for guess in guesses:
             for result in solution_group.results:
-                print(f"Calculating cache for {guess!r} ({result}): ", end = "")
                 # Find result for guess
                 context.next_turn(guess, result)
                 new_solution_group = solution_group.copy()
@@ -27,19 +26,110 @@ def main():
                 if len(new_solution_group) <= 2:
                     # Result too simple to cache
                     if len(new_solution_group) == 0:
-                        print("No solutions")
+                        msg = "No cache (No solutions)"
                     elif len(new_solution_group) == 1:
-                        print("One solution")
+                        msg = "No cache (Only one solution)"
                     else:
-                        print("Two solutions")
+                        msg = "No cache (Only two solutions)"
 
-                    context.reset()
-                    continue
+                else:
+                    # Check if value is already cached
+                    r, g, f = context.load_guesses()
+                    if r is not None:
+                        # Show message
+                        msg = "Cached"
+                    else:
+                        new_guess_group = guess_group.copy()
+                        r, g, f = wordle_solver.best_guesses(new_guess_group, new_solution_group, progress = None, mp = mp)
+                        msg = "Added"
 
-                new_guess_group = guess_group.copy()
-                wordle_solver.best_guesses(new_guess_group, new_solution_group, progress = None, mp = mp)
-                print("Cached")
                 context.reset()
+                print(f"Cache for {guess!r} ({result}): {msg}")
 
 if __name__ == "__main__":
     main()
+
+# Attempt at multiprocessing
+# Abandoned, because it seemed it was possible to corrupt the cache (lock timeout?), and
+# I am not convinced it was faster.
+# def main():
+#     # Go through all game contexts
+#     mp = True
+#     for context in wordle_contexts.get_all_contexts():
+#         print(f"Building cache for {'naive' if context.naive else 'smart'} {context.name} Length {context.word_length}")
+
+#         # Setup solver
+#         guess_group = context.get_guess_group()
+#         solution_group = context.get_solution_group()
+
+#         # Get initial guesses
+#         rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group, mp = mp)
+#         for guess in guesses:
+#             max_jobs = mp * 2
+#             with concurrent.futures.ProcessPoolExecutor() as executor:
+#                 fs = []
+#                 rs = []
+#                 for result in solution_group.results:
+#                     # Find result for guess
+#                     context.next_turn(guess, result)
+#                     new_solution_group = solution_group.copy()
+#                     new_solution_group.filter_solutions(guess, result)
+
+#                     if len(new_solution_group) <= 2:
+#                         # Result too simple to cache
+#                         if len(new_solution_group) == 0:
+#                             msg = "No solutions"
+#                         elif len(new_solution_group) == 1:
+#                             msg = "Only one solution"
+#                         else:
+#                             msg = "Only two solutions"
+#                         print(f"Cache for {guess!r} ({result}): No cache ({msg})")
+
+#                         context.reset()
+#                         continue
+
+#                     # Check if value is already cached
+#                     r, g, f = context.load_guesses()
+#                     if r is not None:
+#                         # Show message
+#                         print(f"Cache for {guess!r} ({result}): Cached")
+#                     else:
+#                         # Calculate, but don't wait for result
+#                         future = executor.submit(wordle_solver.best_guesses, guess_group.copy(), new_solution_group, progress = False, mp = mp)
+#                         fs.append(future)
+#                         rs.append(result)
+
+#                         if len(fs) >= max_jobs:
+#                             # Wait for some to complete
+#                             concurrent.futures.wait(fs, return_when = concurrent.futures.FIRST_COMPLETED)
+
+#                             # Get results of completed once
+#                             for i in range(len(fs)):
+#                                 future = fs[i]
+#                                 result = rs[i]
+#                                 fs[i] = None
+#                                 rs[i] = None
+#                                 if future.done():
+#                                     # Get result (disreguard actual result; already saved)
+#                                     r, g, f = future.result()
+
+#                                     # Show message
+#                                     print(f"Cache for {guess!r} ({result}): Added")
+
+#                             # Remove processed futures
+#                             fs = [f for f in fs if f is not None]
+#                             rs = [r for r in rs if r is not None]
+
+#                     context.reset()
+
+#                 # Wait for all to complete
+#                 # Get results of completed once
+#                 for i in range(len(fs)):
+#                     future = fs[i]
+#                     result = rs[i]
+
+#                     # Get result (disreguard actual result; already saved)
+#                     r, g, f = future.result()
+
+#                     # Show message
+#                     print(f"Cache for {guess!r} ({result}): Added")
