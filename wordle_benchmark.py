@@ -68,7 +68,7 @@ def benchmark(context, mp = True):
                 turn_stats[turns] += 1
 
                 print(f"{solution} solved in {turns} "
-                    f"Turns average: {turn_total / turn_count:.2f}",
+                    f"Turns average: {turn_total / turn_count:.4f}",
                     file = f, flush = True)
         stop = time.perf_counter()
 
@@ -78,7 +78,7 @@ def benchmark(context, mp = True):
             for i in range(min(turn_stats.keys()), max(turn_stats.keys()) + 1):
                 print(f"Solved {turn_stats[i]} words in {i} turns", file = fd)
 
-            print(f"Solved words an average of {turn_total / turn_count:.2f} "
+            print(f"Solved words an average of {turn_total / turn_count:.4f} "
                 f"turns in {stop - start:.2f} secs", file = fd)
 
 if __name__ == "__main__":
