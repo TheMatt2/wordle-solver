@@ -527,38 +527,38 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True, cache 
                 enabled = progress is not False) as progress_bar_mp, \
                 concurrent.futures.ProcessPoolExecutor(mp) as executor:
 
-                for guess_list in [solution_group, filter_blacklist(guess_group, solution_group)]:
-                    if not guess_list:
-                        # On the chance all guesses are solutions
-                        # There *must* be guesses that are solutions
-                        assert best_rank is not None, "No guesses that are solutions found"
-                        continue
+            for guess_list in [solution_group, filter_blacklist(guess_group, solution_group)]:
+                if not guess_list:
+                    # On the chance all guesses are solutions
+                    # There *must* be guesses that are solutions
+                    assert best_rank is not None, "No guesses that are solutions found"
+                    continue
 
-                    # Process for each batch
-                    fs = []
-                    for guess_chunk in chunked(guess_list, mp):
-                        future = executor.submit(solution_group._guess_rank_mp,
-                            progress_bar_mp.worker_loop(guess_chunk))
-                        fs.append(future)
+                # Process for each batch
+                fs = []
+                for guess_chunk in chunked(guess_list, mp):
+                    future = executor.submit(solution_group._guess_rank_mp,
+                        progress_bar_mp.worker_loop(guess_chunk))
+                    fs.append(future)
 
-                    progress_bar_mp.parent_loop(lambda x: wait_exception_or_completed(fs, x))
+                progress_bar_mp.parent_loop(lambda x: wait_exception_or_completed(fs, x))
 
-                    for future in fs:
-                        rank, guesses, foils = future.result()
+                for future in fs:
+                    rank, guesses, foils = future.result()
 
-                        if not best_rank or rank < best_rank:
-                            best_rank = rank
-                            best_guesses = guesses
-                            best_foils = foils
+                    if not best_rank or rank < best_rank:
+                        best_rank = rank
+                        best_guesses = guesses
+                        best_foils = foils
 
-                        elif rank == best_rank:
-                            best_guesses.extend(guesses)
-                            best_foils.extend(foils)
+                    elif rank == best_rank:
+                        best_guesses.extend(guesses)
+                        best_foils.extend(foils)
 
-                    # No need to continue processing if rank is < 2
-                    if best_rank < 2:
-                        progress_bar_mp.complete()
-                        break
+                # No need to continue processing if rank is < 2
+                if best_rank < 2:
+                    progress_bar_mp.complete()
+                    break
 
     else:
         # Use single process
