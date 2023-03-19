@@ -226,7 +226,7 @@ class AllWordsGuessGroup(BaseWordGroup):
         if excluded_letters is None:
             excluded_letters = set()
 
-        self.excluded_letters = excluded_letters
+        self.excluded_letters = set(excluded_letters)
         self.context = context
 
     def __len__(self):
@@ -241,7 +241,7 @@ class AllWordsGuessGroup(BaseWordGroup):
         """Iterate over all possible words"""
         # Use product() to create all words of possible letters
         included_letters = self.excluded_letters.symmetric_difference(self.context.letters)
-        for word in itertools.product(*[included_letters] * self.context.word_length):
+        for word in itertools.product(included_letters, repeat = self.context.word_length):
             yield "".join(word)
 
     def copy(self):
