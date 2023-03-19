@@ -6,6 +6,7 @@ import wordle_contexts
 
 def main():
     # Go through all game contexts
+    mp = True
     for context in wordle_contexts.get_all_contexts():
         print(f"Building cache for {'naive' if context.naive else 'smart'} {context.name} Length {context.word_length}")
 
@@ -14,7 +15,7 @@ def main():
         solution_group = context.get_solution_group()
 
         # Get initial guesses
-        rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group)
+        rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group, mp = mp)
         for guess in guesses:
             for result in solution_group.results:
                 print(f"Calculating cache for {guess!r} ({result}): ", end = "")
@@ -36,7 +37,7 @@ def main():
                     continue
 
                 new_guess_group = guess_group.copy()
-                wordle_solver.best_guesses(new_guess_group, new_solution_group, progress = None)
+                wordle_solver.best_guesses(new_guess_group, new_solution_group, progress = None, mp = mp)
                 print("Cached")
                 context.reset()
 
