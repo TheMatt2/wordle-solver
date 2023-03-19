@@ -8,6 +8,53 @@ from multiprocessing import cpu_count
 from wordle_utils import progress_bar, ProgressBarMP, \
     wait_exception_or_completed, chunked, filter_blacklist
 
+def wordle_result(guess, solution, context):
+    """Given a guess and solution, generate the coloring wordle would show"""
+    # Result calculation is basically check if guess letter matches
+    # solution, but there is some complexity to account for duplicate
+    # letters.
+    assert len(guess) == context.word_length, \
+        f"guess {guess!r} is not {context.word_length} letters"
+    assert len(solution) == context.word_length, \
+        f"solution {solution!r} is not {context.word_length} letters"
+
+    # "u" is unassigned temporary value
+    result = ["u"] * context.word_length
+
+    # First Pass, Correct and Absent
+    for index in range(context.word_length):
+        if guess[index] == solution[index]:
+            # Correct
+            result[index] = "g"
+        elif guess[index] not in solution:
+            # Absent
+            result[index] = "b"
+
+    # Second Pass Count Remaining Letters
+    # Count letters
+    solution_letters = {l: 0 for l in context.letters}
+    for index in range(context.word_length):
+        if result[index] != "g":
+            solution_letters[solution[index]] += 1
+
+    # Third Pass
+    # Mark Present
+    for index in range(context.word_length):
+        if result[index] == "u":
+            # Evaluate if Present
+            assert guess[index] in solution
+
+            # If letters remaining, mark as present
+            # Left to Right
+            if solution_letters[guess[index]]:
+                solution_letters[guess[index]] -= 1
+                result[index] = "y"
+            else:
+                # None Remaining
+                result[index] = "b"
+
+    return "".join(result)
+
 class BaseWordGroup(metaclass = ABCMeta):
     """
     Base class to represent a group of words, and
@@ -401,52 +448,13 @@ class SolutionGroup(BaseSolutionGroup):
         # G is correct
         # Y is present
         # B is absent
-        if __debug__:
-            # Total is tracked as a sanity check
-            total = 0
+        partitions = {}
+        for solution in self:
+            result = wordle_result(guess, solution, self.context)
+            partitions.setdefault(result, set()).add(solution)
 
-        # Words that are already returned from filter_solutions() will not be
-        # returned by other result. So keep a list of processed words, and don't
-        # consider them for further filtering.
-        processed_words = set()
-        for result in self.results:
-            # Check if this result can occur
-            if not result_possible(guess, result, self.context):
-                continue
-
-            # If processed words contains all words, we are done
-            if len(self) == len(processed_words):
-                # No words left to process
-                break
-
-            # Create copy of solution group to process
-            solution_part = self.copy()
-
-            # Remove already processed words. If a word appeared in a
-            # prevous result, word comparison, then it won't appear again
-            solution_part._word_list.difference_update(processed_words)
-
-            # Calculate number of words that remain if this result occurs
-            solution_part.filter_solutions(guess, result)
-
-            # Calculate the percent of words that fall in this group
-            if __debug__:
-                total += len(solution_part) # Sanity check
-
-            assert processed_words.isdisjoint(solution_part._word_list), \
-                f"Results have overlapping words: " \
-                f"{processed_words.intersection(solution_part._word_list)}"
-
-            processed_words.update(solution_part._word_list)
-
-            # Yield the partition, if non-empty
-            if solution_part:
-                yield result, solution_part
-
-            assert len(processed_words) == total
-
-        assert total == len(self), \
-            f"total = {total} and remaining words {len(self)} differ for guess {guess}"
+        for result, solution_part in partitions.items():
+            yield result, self.__class__(solution_part, self.context)
 
     def _guess_rank_mp(self, guess_group):
         assert guess_group, "No guesses to rank"

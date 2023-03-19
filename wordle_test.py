@@ -23,53 +23,6 @@ else:
 
         return "".join(coloring) + Back.RESET + f" ({result})"
 
-def wordle_result(guess, solution, context):
-    """Given a guess and solution, generate the coloring wordle would show"""
-    # Result calculation is basically check if guess letter matches
-    # solution, but there is some complexity to account for duplicate
-    # letters.
-    assert len(guess) == context.word_length, \
-        f"guess {guess!r} is not {context.word_length} letters"
-    assert len(solution) == context.word_length, \
-        f"solution {solution!r} is not {context.word_length} letters"
-
-    # "u" is unassigned temporary value
-    result = ["u"] * context.word_length
-
-    # First Pass, Correct and Absent
-    for index in range(context.word_length):
-        if guess[index] == solution[index]:
-            # Correct
-            result[index] = "g"
-        elif guess[index] not in solution:
-            # Absent
-            result[index] = "b"
-
-    # Second Pass Count Remaining Letters
-    # Count letters
-    solution_letters = {l: 0 for l in context.letters}
-    for index in range(context.word_length):
-        if result[index] != "g":
-            solution_letters[solution[index]] += 1
-
-    # Third Pass
-    # Mark Present
-    for index in range(context.word_length):
-        if result[index] == "u":
-            # Evaluate if Present
-            assert guess[index] in solution
-
-            # If letters remaining, mark as present
-            # Left to Right
-            if solution_letters[guess[index]]:
-                solution_letters[guess[index]] -= 1
-                result[index] = "y"
-            else:
-                # None Remaining
-                result[index] = "b"
-
-    return "".join(result)
-
 def wordle_test(solution, context, progress = True, mp = True):
     """Play wordle, and time how long it takes.
        If no solution is provided, a worst case scenario is calculated.
@@ -95,7 +48,7 @@ def wordle_test(solution, context, progress = True, mp = True):
 
         # If no solution, use foil
         if solution:
-            result = wordle_result(guess, solution, context)
+            result = wordle_solver.wordle_result(guess, solution, context)
         else:
             rank, result = solution_group.guess_rank(guess)
 
