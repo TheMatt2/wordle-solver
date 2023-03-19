@@ -2,7 +2,6 @@ import time
 import itertools
 from abc import ABCMeta, abstractmethod
 
-import math
 import concurrent.futures
 from multiprocessing import cpu_count
 
@@ -161,9 +160,6 @@ class WordGroup(BaseWordGroup):
         return excluded_letters
 
 class GuessGroup(WordGroup):
-    """
-    Use results learned from playing the game to refine possible guesses.
-    """
     def filter_guesses(self, excluded_letters):
         """
         Filter out guesses that are not possible based on excluded letters.
