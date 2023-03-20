@@ -251,6 +251,11 @@ class Context:
 
     def _load_guess_data(self):
          if self._cache_data is None:
+            # If tempfile exists, refuse to load
+            tmpfile = f"{self._guesses_filename()}.tmp"
+            if os.path.exists(tmpfile):
+                raise FileExistsError("Temp file exists for cache. Something is wrong.")
+
             # Try to load cache
             try:
                 with open(self._guesses_filename()) as f:
@@ -259,13 +264,19 @@ class Context:
                 self._cache_data = {}
 
     def _save_guess_data(self):
-        with open(self._guesses_filename(), "w") as f:
+        # Dump first to a temp file, to avoid half writing the cache
+        # Because it turns out safely writing file is hard
+        tmpfile = f"{self._guesses_filename()}.tmp"
+        with open(tmpfile, "w") as f:
             hjson.dumpJSON(self._cache_data, f, indent = "\t")
+
+        # Move temp file to actual file
+        os.replace(tmpfile, self._guesses_filename())
 
     def load_guesses(self):
         """Get the best guess for this turn."""
         # Return cache data, for the particular words guessed
-        with filelock.FileLock(f"{self._guesses_filename()}.lck", timeout = 1):
+        with filelock.FileLock(f"{self._guesses_filename()}.lck", timeout = 15):
             self._load_guess_data()
 
         cache_data = self._cache_data
@@ -300,7 +311,7 @@ class Context:
             return
 
         # Make sure cache is loaded, use file lock to prevent collisions
-        with filelock.FileLock(f"{self._guesses_filename()}.lck", timeout = 1):
+        with filelock.FileLock(f"{self._guesses_filename()}.lck", timeout = 15):
             self._load_guess_data()
             cache_data = self._cache_data
             for word, result in self._words_guessed:
