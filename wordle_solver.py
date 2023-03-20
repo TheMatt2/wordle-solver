@@ -439,7 +439,7 @@ class SolutionGroup(BaseSolutionGroup):
         # Foil is the result that keeps the most combinations
         return rank, foil
 
-    def partition(self, guess):
+    def partition(self, guess, sort = False):
         """
         Generate partitions solutions for each possible result of guess.
         """
@@ -453,8 +453,12 @@ class SolutionGroup(BaseSolutionGroup):
             result = wordle_result(guess, solution, self.context)
             partitions.setdefault(result, set()).add(solution)
 
-        for result, solution_part in partitions.items():
-            yield result, self.__class__(solution_part, self.context)
+        if sort:
+            for result, solution_part in sorted(partitions.items()):
+                yield result, self.__class__(solution_part, self.context)
+        else:
+            for result, solution_part in partitions.items():
+                yield result, self.__class__(solution_part, self.context)
 
     def _guess_rank_mp(self, guess_group):
         assert guess_group, "No guesses to rank"

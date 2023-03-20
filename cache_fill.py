@@ -17,17 +17,15 @@ def main():
         # Get initial guesses
         rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group, mp = mp)
         for guess in guesses:
-            for result in solution_group.results:
+            cache_count = 0
+            for result, new_solution_group in solution_group.partition(guess, sort = True):
                 # Find result for guess
                 context.next_turn(guess, result)
-                new_solution_group = solution_group.copy()
-                new_solution_group.filter_solutions(guess, result)
 
                 if len(new_solution_group) <= 2:
                     # Result too simple to cache
-                    if len(new_solution_group) == 0:
-                        msg = "No cache (No solutions)"
-                    elif len(new_solution_group) == 1:
+                    assert len(new_solution_group) > 0
+                    if len(new_solution_group) == 1:
                         msg = "No cache (Only one solution)"
                     else:
                         msg = "No cache (Only two solutions)"
@@ -43,10 +41,21 @@ def main():
                         r, g, f = wordle_solver.best_guesses(new_guess_group, new_solution_group, progress = None, mp = mp)
                         msg = "Added"
 
+                    cache_count += 1
+
                 context.reset()
                 print(f"Cache for {guess!r} ({result}): {msg}")
 
 
+            # Verify the number of results in the cache
+            real_cache_count = len(context._cache_data[guess]["next_turn"])
+            if real_cache_count != cache_count:
+                print(f"Cache for {guess!r}: {real_cache_count} results in cache, but {cache_count} results were calculated")
+                raise RuntimeError(f"Incoherent cache!!! for {guess!r}")
+            else:
+                print(f"Cache for {guess!r}: {cache_count} results")
+
+"""
 # Attempt at multiprocessing
 # Abandoned, because it seemed it was possible to corrupt the cache (lock timeout?), and
 # I am not convinced it was faster.
@@ -147,6 +156,7 @@ def main_mp(mp = True):
 
                     # Show message
                     print(f"Cache for {guess!r} ({result}): Added")
+"""
 
 if __name__ == "__main__":
     main()
