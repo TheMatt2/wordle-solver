@@ -312,6 +312,7 @@ class Context:
 
         # Make sure cache is loaded, use file lock to prevent collisions
         with filelock.FileLock(f"{self._guesses_filename()}.lck", timeout = 15):
+            self._cache_data = None # purge to force reload
             self._load_guess_data()
             cache_data = self._cache_data
             for word, result in self._words_guessed:
