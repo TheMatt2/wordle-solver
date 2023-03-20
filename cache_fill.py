@@ -20,47 +20,48 @@ def main():
             unsaved_results = 0
             max_unsaved_results = 10
             cache_results = set()
-            for result, new_solution_group in solution_group.partition(guess, sort = True):
-                # Find result for guess
-                context.next_turn(guess, result)
+            try:
+                for result, new_solution_group in solution_group.partition(guess, sort = True):
+                    # Find result for guess
+                    context.next_turn(guess, result)
 
-                if len(new_solution_group) <= 2:
-                    # Result too simple to cache
-                    assert len(new_solution_group) > 0
-                    if len(new_solution_group) == 1:
-                        msg = "No cache (Only one solution)"
+                    if len(new_solution_group) <= 2:
+                        # Result too simple to cache
+                        assert len(new_solution_group) > 0
+                        if len(new_solution_group) == 1:
+                            msg = "No cache (Only one solution)"
+                        else:
+                            msg = "No cache (Only two solutions)"
+
                     else:
-                        msg = "No cache (Only two solutions)"
+                        cache_results.add(result)
 
-                else:
-                    cache_results.add(result)
+                        # Check if value is already cached
+                        r, g, f = context.load_guesses()
+                        if r is not None:
+                            # Show message
+                            msg = "Cached"
+                        else:
+                            # Do not use the cache, override and save manually
+                            r, g, f = wordle_solver.best_guesses(guess_group.copy(),
+                                new_solution_group, progress = None, mp = mp, cache = False)
 
-                    # Check if value is already cached
-                    r, g, f = context.load_guesses()
-                    if r is not None:
-                        # Show message
-                        msg = "Cached"
-                    else:
-                        # Do not use the cache, override and save manually
-                        r, g, f = wordle_solver.best_guesses(guess_group.copy(),
-                            new_solution_group, progress = None, mp = mp, cache = False)
+                            msg = "Added"
+                            unsaved_results += 1
 
-                        msg = "Added"
-                        unsaved_results += 1
+                            # Save without flushing to disk
+                            context._save_guesses_internal(r, g, f)
+                            if unsaved_results >= max_unsaved_results:
+                                # Save to disk
+                                context._save_guess_data()
+                                unsaved_results = 0
 
-                        # Save without flushing to disk
-                        context._save_guesses_internal(r, g, f)
-                        if unsaved_results >= max_unsaved_results:
-                            # Save to disk
-                            context._save_guess_data()
-                            unsaved_results = 0
-
-                context.reset()
-                print(f"Cache for {guess!r} ({result}): {msg}")
-
-            # Make sure all words are saved
-            if unsaved_results:
-                context._save_guess_data()
+                    context.reset()
+                    print(f"Cache for {guess!r} ({result}): {msg}")
+            finally:
+                # Make sure all words are saved
+                if unsaved_results:
+                    context._save_guess_data()
 
             # Verify the number of results in the cache
             real_cache_results = set(context._cache_data[guess]["next_turn"])
