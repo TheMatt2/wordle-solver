@@ -17,7 +17,7 @@ def main():
         # Get initial guesses
         rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group, mp = mp)
         for guess in guesses:
-            cache_count = 0
+            cache_results = set()
             for result, new_solution_group in solution_group.partition(guess, sort = True):
                 # Find result for guess
                 context.next_turn(guess, result)
@@ -31,6 +31,8 @@ def main():
                         msg = "No cache (Only two solutions)"
 
                 else:
+                    cache_results.add(result)
+
                     # Check if value is already cached
                     r, g, f = context.load_guesses()
                     if r is not None:
@@ -41,19 +43,28 @@ def main():
                         r, g, f = wordle_solver.best_guesses(new_guess_group, new_solution_group, progress = None, mp = mp)
                         msg = "Added"
 
-                    cache_count += 1
-
                 context.reset()
                 print(f"Cache for {guess!r} ({result}): {msg}")
 
-
             # Verify the number of results in the cache
-            real_cache_count = len(context._cache_data[guess]["next_turn"])
-            if real_cache_count != cache_count:
-                print(f"Cache for {guess!r}: {real_cache_count} results in cache, but {cache_count} results were calculated")
-                raise RuntimeError(f"Incoherent cache!!! for {guess!r}")
+            real_cache_results = set(context._cache_data[guess]["next_turn"])
+            if cache_results != real_cache_results:
+                print(f"Cache for {guess!r}: {len(real_cache_results)} results in cache, but {len(cache_results)} results were calculated")
+                for result in sorted(cache_results.difference(real_cache_results)):
+                    print(f"Cache for {guess!r}: result {result} was calculated but not in cache")
+
+                for result in sorted(real_cache_results.difference(cache_results)):
+                    # Check if the result is possible
+                    if wordle_solver.result_possible(guess, result, context):
+                        print(f"Cache for {guess!r}: result {result} is in cache but not possible")
+                        # del context._cache_data[guess]["next_turn"][result]
+                        # context._save_guess_data()
+                    else:
+                        print(f"Cache for {guess!r}: result {result} is in cache but was not calculated (but possible)")
+
+                exit(1)
             else:
-                print(f"Cache for {guess!r}: {cache_count} results")
+                print(f"Cache for {guess!r}: {len(cache_results)} results")
 
 """
 # Attempt at multiprocessing
