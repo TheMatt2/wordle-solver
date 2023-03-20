@@ -77,6 +77,10 @@ def main_mp(mp = True):
                     new_solution_group = solution_group.copy()
                     new_solution_group.filter_solutions(guess, result)
 
+                    # Check if value is cached
+                    r, g, f = context.load_guesses()
+                    cached = r is not None
+
                     if len(new_solution_group) <= 2:
                         # Result too simple to cache
                         if len(new_solution_group) == 0:
@@ -85,14 +89,19 @@ def main_mp(mp = True):
                             msg = "Only one solution"
                         else:
                             msg = "Only two solutions"
-                        print(f"Cache for {guess!r} ({result}): No cache ({msg})")
+
+                        # Value should not be cached
+                        if cached:
+                            print(f"Cache for {guess!r} ({result}): Incoherent cache!!! Should be no cache ({msg})")
+                            raise RuntimeError(f"Incoherent cache!!! for {guess!r} ({result})")
+                        else:
+                            print(f"Cache for {guess!r} ({result}): No cache ({msg})")
 
                         context.reset()
                         continue
 
                     # Check if value is already cached
-                    r, g, f = context.load_guesses()
-                    if r is not None:
+                    if cached:
                         # Show message
                         print(f"Cache for {guess!r} ({result}): Cached")
                     else:
