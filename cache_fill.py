@@ -47,13 +47,13 @@ def main():
 
                         msg = "Added"
                         unsaved_results += 1
+
+                        # Save without flushing to disk
+                        context._save_guesses_internal(r, g, f)
                         if unsaved_results >= max_unsaved_results:
-                            # Save cache
-                            context.save_guesses(r, g, f)
+                            # Save to disk
+                            context._save_guess_data()
                             unsaved_results = 0
-                        else:
-                            # Don't save to disk
-                            context._save_guesses_internal(r, g, f)
 
                 context.reset()
                 print(f"Cache for {guess!r} ({result}): {msg}")
@@ -194,5 +194,5 @@ def main_mp(mp = True):
                 exit(1)
 
 if __name__ == "__main__":
-    # main()
-    main_mp()
+    main()
+    # main_mp()
