@@ -68,7 +68,7 @@ def ask_result(word, context):
             print(f"{result!r} is not a valid result. Please enter result again.")
 
         # Make sure result is possible
-        elif not wordle_solver.result_possible(word, result, context):
+        elif not wordle_solver.is_result_possible(word, result, context):
             print(f"{result!r} is not possible for {word!r}. Please enter result again.")
             continue
 

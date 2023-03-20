@@ -66,12 +66,12 @@ def main():
             real_cache_results = set(context._cache_data[guess]["next_turn"])
             if cache_results != real_cache_results:
                 print(f"Cache for {guess!r}: {len(real_cache_results)} results in cache, but {len(cache_results)} results were calculated")
-                for result in sorted(cache_results.difference(real_cache_results)):
+                for result in sorted(cache_results.difference(real_cache_results), key = wordle_solver._result_key):
                     print(f"Cache for {guess!r}: result {result} was calculated but not in cache")
 
-                for result in sorted(real_cache_results.difference(cache_results)):
+                for result in sorted(real_cache_results.difference(cache_results), key = wordle_solver._result_key):
                     # Check if the result is possible
-                    if wordle_solver.result_possible(guess, result, context):
+                    if wordle_solver.is_result_possible(guess, result, context):
                         print(f"Cache for {guess!r}: result {result} is in cache but was not calculated (but possible)")
                     else:
                         print(f"Cache for {guess!r}: result {result} is in cache but not possible")
@@ -125,6 +125,7 @@ def main_mp(mp = True):
                     cache_results.add(result)
                     # Check if value is already cached
                     r, g, f = context.load_guesses()
+                    context.reset()
                     if r is not None:
                         # Show message
                         print(f"Cache for {guess!r} ({result}): Cached")
@@ -143,7 +144,9 @@ def main_mp(mp = True):
 
                                 # Get result
                                 r, g, f = future.result()
+                                context.next_turn(guess, result)
                                 context._save_guesses_internal(r, g, f)
+                                context.reset()
 
                                 # Show message
                                 print(f"Cache for {guess!r} ({result}): Added")
@@ -154,8 +157,6 @@ def main_mp(mp = True):
                             fs = []
                             rs = []
 
-                    context.reset()
-
                 # Wait for all to complete
                 # Get results of completed once
                 for i in range(len(fs)):
@@ -164,7 +165,9 @@ def main_mp(mp = True):
 
                     # Get result
                     r, g, f = future.result()
+                    context.next_turn(guess, result)
                     context._save_guesses_internal(r, g, f)
+                    context.reset()
 
                     # Show message
                     print(f"Cache for {guess!r} ({result}): Added")
@@ -176,12 +179,12 @@ def main_mp(mp = True):
             real_cache_results = set(context._cache_data[guess]["next_turn"])
             if cache_results != real_cache_results:
                 print(f"Cache for {guess!r}: {len(real_cache_results)} results in cache, but {len(cache_results)} results were calculated")
-                for result in sorted(cache_results.difference(real_cache_results)):
+                for result in sorted(cache_results.difference(real_cache_results), key = wordle_solver._result_key):
                     print(f"Cache for {guess!r}: result {result} was calculated but not in cache")
 
-                for result in sorted(real_cache_results.difference(cache_results)):
+                for result in sorted(real_cache_results.difference(cache_results), key = wordle_solver._result_key):
                     # Check if the result is possible
-                    if wordle_solver.result_possible(guess, result, context):
+                    if wordle_solver.is_result_possible(guess, result, context):
                         print(f"Cache for {guess!r}: result {result} is in cache but was not calculated (but possible)")
                     else:
                         print(f"Cache for {guess!r}: result {result} is in cache but not possible")
@@ -191,5 +194,5 @@ def main_mp(mp = True):
                 exit(1)
 
 if __name__ == "__main__":
-    main()
-    # main_mp()
+    # main()
+    main_mp()

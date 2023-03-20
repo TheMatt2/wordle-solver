@@ -310,7 +310,7 @@ class BaseSolutionGroup(WordGroup):
         """
         pass
 
-def result_possible(word, result, context):
+def is_result_possible(word, result, context):
     # If a letter is duplicated, then the first instance must be found
     absent = set()
 
@@ -323,28 +323,47 @@ def result_possible(word, result, context):
                 return False
     return True
 
+# Create list of possible results
+_RESULTS = {}
+
+def possible_results(word, context):
+    """Return all possible results for word"""
+    if context.word_length not in _RESULTS:
+        # Calculate results
+        results = ["".join(result) for result in itertools.product("byg", repeat = context.word_length)]
+
+        # You can't have 4 known letters, and 1 incorrectly positioned
+        results = [result for result in results if result.count("y") != 1 or "b" in result]
+        _RESULTS[context.word_length] = results
+
+    # Filter out impossible results for this word first
+    for result in _RESULTS[context.word_length]:
+        if is_result_possible(word, result, context):
+            yield result
+
+def _result_key(result):
+    """Helper function to sort by largest space first"""
+    # b > y = 1 > g = 2
+    # lower is larger space
+    # (This algorithm was invented by Github Copilot)
+    space = result.count("b") + result.count("y") * 2 + result.count("g") * 4
+
+    # Use order "byg" as tie breaker
+    sort_order = []
+    for l in result:
+        if l == "b":
+            sort_order.append(0)
+        elif l == "y":
+            sort_order.append(1)
+        else:
+            sort_order.append(2)
+
+    return space, tuple(sort_order)
+
 class SolutionGroup(BaseSolutionGroup):
     """
     Use results learned from playing the game to refine possible solutions.
     """
-    # Create list of possible results
-    _RESULTS = {}
-
-    @property
-    def results(self):
-        """Get list of possible results"""
-        if self.context.word_length in self._RESULTS:
-            return self._RESULTS[self.context.word_length]
-
-        # Calculate results
-        results = ["".join(result) for result in itertools.product(*["gyb"] * self.context.word_length)]
-
-        # You can't have 4 known letters, and 1 incorrectly positioned
-        results = [result for result in results if result.count("y") != 1 or "b" in result]
-        results.reverse()
-        self._RESULTS[self.context.word_length] = results
-        return results
-
     def filter_solutions(self, word, result):
         """Remove solutions that are not consistant with word and result."""
         # Update statistics, if needed
@@ -454,11 +473,12 @@ class SolutionGroup(BaseSolutionGroup):
             partitions.setdefault(result, set()).add(solution)
 
         if sort:
-            for result, solution_part in sorted(partitions.items()):
-                yield result, self.__class__(solution_part, self.context)
+            partitions_items = sorted(partitions.items(), key = _result_key)
         else:
-            for result, solution_part in partitions.items():
-                yield result, self.__class__(solution_part, self.context)
+            partitions_items = partitions.items()
+
+        for result, solution_part in partitions_items:
+            yield result, self.__class__(solution_part, self.context)
 
     def _guess_rank_mp(self, guess_group):
         assert guess_group, "No guesses to rank"
