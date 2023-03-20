@@ -304,6 +304,25 @@ class Context:
 
         return rank, guesses, foils
 
+    def _save_guesses_internal(self, rank, guesses, foils):
+        """Save guesses into the cache, does not write to disk."""
+        cache_data = self._cache_data
+        for word, result in self._words_guessed:
+            # Attempt to traverse to the point in the cache
+            # with guess for these series of words
+            if word in cache_data:
+                cache_data = cache_data[word].setdefault("next_turn", {}).setdefault(result, {})
+            else:
+                return
+
+        # Add guesses to cache (replacing existing)
+        cache_data.clear()
+        for guess, foil in zip(guesses, foils):
+            cache_data[guess] = {
+                "rank": rank,
+                "foil": foil,
+            }
+
     def save_guesses(self, rank, guesses, foils):
         """Save guesses into the cache."""
         # Do not save guesses further than 1 turn
@@ -314,23 +333,7 @@ class Context:
         with filelock.FileLock(f"{self._guesses_filename()}.lck", timeout = 15):
             self._cache_data = None # purge to force reload
             self._load_guess_data()
-            cache_data = self._cache_data
-            for word, result in self._words_guessed:
-                # Attempt to traverse to the point in the cache
-                # with guess for these series of words
-                if word in cache_data:
-                    cache_data = cache_data[word].setdefault("next_turn", {}).setdefault(result, {})
-                else:
-                    return
-
-            # Add guesses to cache (replacing existing)
-            cache_data.clear()
-            for guess, foil in zip(guesses, foils):
-                cache_data[guess] = {
-                    "rank": rank,
-                    "foil": foil,
-                }
-
+            self._save_guesses_internal(rank, guesses, foils)
             self._save_guess_data()
 
     def get_word_list(self):

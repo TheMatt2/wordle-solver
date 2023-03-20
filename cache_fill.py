@@ -17,6 +17,8 @@ def main():
         # Get initial guesses
         rank, guesses, foils = wordle_solver.best_guesses(guess_group, solution_group, mp = mp)
         for guess in guesses:
+            unsaved_results = 0
+            max_unsaved_results = 10
             cache_results = set()
             for result, new_solution_group in solution_group.partition(guess, sort = True):
                 # Find result for guess
@@ -40,11 +42,25 @@ def main():
                         msg = "Cached"
                     else:
                         new_guess_group = guess_group.copy()
-                        r, g, f = wordle_solver.best_guesses(new_guess_group, new_solution_group, progress = None, mp = mp)
+                        # Do not use the cache, override and save manually
+                        r, g, f = wordle_solver.best_guesses(new_guess_group, new_solution_group, progress = None, mp = mp, cache = False)
+
                         msg = "Added"
+                        unsaved_results += 1
+                        if unsaved_results >= max_unsaved_results:
+                            # Save cache
+                            context.save_guesses(r, g, f)
+                            unsaved_results = 0
+                        else:
+                            # Don't save to disk
+                            context._save_guesses_internal(r, g, f)
 
                 context.reset()
                 print(f"Cache for {guess!r} ({result}): {msg}")
+
+            # Make sure all words are saved
+            if unsaved_results:
+                context._save_guess_data()
 
             # Verify the number of results in the cache
             real_cache_results = set(context._cache_data[guess]["next_turn"])
