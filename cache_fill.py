@@ -56,12 +56,12 @@ def main():
                 for result in sorted(real_cache_results.difference(cache_results)):
                     # Check if the result is possible
                     if wordle_solver.result_possible(guess, result, context):
+                        print(f"Cache for {guess!r}: result {result} is in cache but was not calculated (but possible)")
+                    else:
                         print(f"Cache for {guess!r}: result {result} is in cache but not possible")
                         # del context._cache_data[guess]["next_turn"][result]
-                        # context._save_guess_data()
-                    else:
-                        print(f"Cache for {guess!r}: result {result} is in cache but was not calculated (but possible)")
 
+                # context._save_guess_data()
                 exit(1)
             else:
                 print(f"Cache for {guess!r}: {len(cache_results)} results")
