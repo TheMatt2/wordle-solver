@@ -6,7 +6,8 @@ import concurrent.futures
 from multiprocessing import cpu_count
 
 from wordle_utils import progress_bar, ProgressBarMP, \
-    wait_exception_or_completed, chunked, filter_blacklist
+    wait_exception_or_completed, chunked, filter_blacklist, \
+    sortdict
 
 def wordle_result(guess, solution, context):
     """Given a guess and solution, generate the coloring wordle would show"""
@@ -473,11 +474,9 @@ class SolutionGroup(BaseSolutionGroup):
             partitions.setdefault(result, set()).add(solution)
 
         if sort:
-            partitions_items = sorted(partitions.items(), key = lambda x: _result_key(x[0]))
-        else:
-            partitions_items = partitions.items()
+            partitions = sortdict(partitions, key = _result_key)
 
-        for result, solution_part in partitions_items:
+        for result, solution_part in partitions.items():
             yield result, self.__class__(solution_part, self.context)
 
     def _guess_rank_mp(self, guess_group):

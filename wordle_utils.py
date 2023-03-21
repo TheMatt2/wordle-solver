@@ -418,3 +418,17 @@ class filter_blacklist:
             item = next(self.iterable)
             if item not in self.blacklist:
                 return item
+
+def sortdict(d, key = None, reverse = False):
+    """
+    Sort a dictionary by key. Uses the dictionary class passed.
+    key: The key to sort by. Passed the dictionary key as an argument.
+    reverse: If True, sort in reverse order.
+    """
+    # Simple utility function since hjson returns OrderedDict, but dict is also valid
+    if key is not None:
+        key_ = lambda x: key(x[0])
+    else:
+        key_ = key
+
+    return d.__class__(sorted(d.items(), key = key_, reverse = reverse))

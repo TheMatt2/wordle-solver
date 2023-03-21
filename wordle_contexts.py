@@ -10,6 +10,8 @@ ALL_WORDS_TOKEN = "ALL_WORDS_ARE_VALID_GUESSES"
 import wordle_solver
 import wordle_scraper
 
+from wordle_utils import sortdict
+
 WORDLE_CONTEXT_IDS = [
     "new_york_times", "wordlegame_org", "wordplay_com", "wordlewebsite_com_daily",
     "wordlewebsite_com_unlimited", "absurdle", "flappy_birdle"]
@@ -311,13 +313,22 @@ class Context:
             # Attempt to traverse to the point in the cache
             # with guess for these series of words
             if word in cache_data:
-                cache_data = cache_data[word].setdefault("next_turn", {}).setdefault(result, {})
+                if result not in cache_data[word].setdefault("next_turn", {}):
+                    cache_data[word]["next_turn"][result] = {}
+
+                    # Make sure results are sorted
+                    cache_data[word]["next_turn"] = sortdict(
+                        cache_data[word]["next_turn"], key = wordle_solver._result_key)
+
+                cache_data = cache_data[word]["next_turn"][result]
             else:
                 return
 
         # Add guesses to cache (replacing existing)
         cache_data.clear()
-        for guess, foil in zip(guesses, foils):
+
+        # Make sure guesses are added in alphabetical order
+        for guess, foil in sorted(zip(guesses, foils)):
             cache_data[guess] = {
                 "rank": rank,
                 "foil": foil,
