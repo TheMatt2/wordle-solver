@@ -185,16 +185,25 @@ def main_mp(mp = True):
             # Verify the number of results in the cache
             real_cache_results = set(context._cache_data[guess]["next_turn"])
             if cache_results != real_cache_results:
-                print(f"Cache for {guess!r}: {len(real_cache_results)} results in cache, but {len(cache_results)} results were calculated")
-                for result in sorted(cache_results.difference(real_cache_results), key = wordle_solver._result_key):
+                print(
+                    f"Cache for {guess!r}: {len(real_cache_results)} results "
+                    f"in cache, but {len(cache_results)} results were calculated")
+
+                for result in sorted(cache_results.difference(real_cache_results),
+                        key = wordle_solver._result_key):
                     print(f"Cache for {guess!r}: result {result} was calculated but not in cache")
 
-                for result in sorted(real_cache_results.difference(cache_results), key = wordle_solver._result_key):
+                for result in sorted(real_cache_results.difference(cache_results),
+                        key = wordle_solver._result_key):
                     # Check if the result is possible
                     if wordle_solver.is_result_possible(guess, result, context):
-                        print(f"Cache for {guess!r}: result {result} is in cache but was not calculated (but possible)")
+                        print(
+                            f"Cache for {guess!r}: result {result} is "
+                            "in cache but was not calculated (but possible)")
                     else:
-                        print(f"Cache for {guess!r}: result {result} is in cache but not possible")
+                        print(
+                            f"Cache for {guess!r}: result {result} is "
+                            "in cache but not possible")
                         # del context._cache_data[guess]["next_turn"][result]
 
                 # context._save_guess_data()

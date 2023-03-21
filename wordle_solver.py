@@ -473,7 +473,7 @@ class SolutionGroup(BaseSolutionGroup):
             partitions.setdefault(result, set()).add(solution)
 
         if sort:
-            partitions_items = sorted(partitions.items(), key = _result_key)
+            partitions_items = sorted(partitions.items(), key = lambda x: _result_key(x[0]))
         else:
             partitions_items = partitions.items()
 
