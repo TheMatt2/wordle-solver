@@ -440,7 +440,7 @@ class SolutionGroup(BaseSolutionGroup):
         foil = None
 
         partitions = 0
-        for result, solution_part in self.partition(guess):
+        for result, solution_part in self.partition(guess, sort = True):
             partitions += 1
 
             part = len(solution_part)
@@ -581,6 +581,9 @@ def best_guesses(guess_group, solution_group, progress = True, mp = True, cache 
                     elif rank == best_rank:
                         best_guesses.extend(guesses)
                         best_foils.extend(foils)
+
+                # Sanity check for duplicates
+                assert len(best_guesses) == len(set(best_guesses)), "Duplicate guesses found"
 
                 # No need to continue processing if rank is < 2
                 if best_rank < 2:

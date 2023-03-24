@@ -379,14 +379,15 @@ def chunked(iterable, n):
     if len(iterable) < n:
         n = len(iterable)
 
-    try:
-        # If iterable supports slicing, use that
-        # Slicing by steps [::n] seems to be faster
-        return [iterable[index::n] for index in range(n)]
-    except TypeError:
-        # Use islice to create the iterables
-        children = itertools.tee(iterable, n)
-        return [itertools.islice(it, index, None, n) for index, it in enumerate(children)]
+    # If iterable does not support slicing, convert to list
+    if not hasattr(iterable, "__getitem__"):
+        iterable = list(iterable)
+
+    # Slicing by steps [::n] seems to be faster
+    # Use slicing instead if itertools.islice because the results need to pickle
+    # correctly. Unfortunely, a set object will change its order after pickling.
+    # This would render the chunked results useless.
+    return [iterable[index::n] for index in range(n)]
 
 class filter_blacklist:
     """
