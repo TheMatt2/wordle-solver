@@ -64,7 +64,13 @@ def main():
                     context._save_guess_data()
 
             # Verify the number of results in the cache
-            real_cache_results = set(context._cache_data[guess]["next_turn"])
+            try:
+                real_cache_results = set(context._cache_data[guess]["next_turn"])
+            except KeyError:
+                # No results in cache, despite filling it
+                # Means the guess must be very good
+                continue
+
             if cache_results != real_cache_results:
                 print(
                     f"Cache for {guess!r}: {len(real_cache_results)} results "
@@ -183,7 +189,13 @@ def main_mp(mp = True):
                 context._save_guess_data()
 
             # Verify the number of results in the cache
-            real_cache_results = set(context._cache_data[guess]["next_turn"])
+            try:
+                real_cache_results = set(context._cache_data[guess]["next_turn"])
+            except KeyError:
+                # No results in cache, despite filling it
+                # Means the guess must be very good
+                continue
+
             if cache_results != real_cache_results:
                 print(
                     f"Cache for {guess!r}: {len(real_cache_results)} results "
