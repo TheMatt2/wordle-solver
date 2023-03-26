@@ -22,7 +22,7 @@ def wordle_result(guess, solution, context):
     # "u" is unassigned temporary value
     result = ["u"] * context.word_length
 
-    # First Pass, Correct and Absent
+    # First Pass: Correct and Absent
     for index in range(context.word_length):
         if guess[index] == solution[index]:
             # Correct
@@ -31,15 +31,13 @@ def wordle_result(guess, solution, context):
             # Absent
             result[index] = "b"
 
-    # Second Pass Count Remaining Letters
-    # Count letters
+    # Second Pass: Count Letters
     solution_letters = {l: 0 for l in context.letters}
     for index in range(context.word_length):
         if result[index] != "g":
             solution_letters[solution[index]] += 1
 
-    # Third Pass
-    # Mark Present
+    # Third Pass: Mark Present
     for index in range(context.word_length):
         if result[index] == "u":
             # Evaluate if Present

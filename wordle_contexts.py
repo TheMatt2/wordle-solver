@@ -119,7 +119,7 @@ def get_all_contexts():
             if not isinstance(length, int):
                 # Multiple lengths
                 min_length, max_length = length
-                for length in range(min_length, max_length):
+                for length in range(min_length, max_length + 1):
                     yield Context(context_id, naive, length)
             else:
                 yield Context(context_id, naive, length)
