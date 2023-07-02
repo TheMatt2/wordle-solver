@@ -1,6 +1,7 @@
 """
 Force generate cache for all game contexts
 """
+import time
 import wordle_solver
 import wordle_contexts
 
@@ -222,5 +223,10 @@ def main_mp(mp = True):
                 exit(1)
 
 if __name__ == "__main__":
-    main()
-    # main_mp()
+    start = time.time()
+    try:
+        main()
+        # main_mp()
+    finally:
+        stop = time.time()
+        print(f"Built word cache in {stop - start:.4f} secs")
