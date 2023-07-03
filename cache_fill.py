@@ -150,6 +150,7 @@ def main_mp(mp = True):
                         print(f"Cache for {guess!r} ({result}): Cached")
                     else:
                         # Calculate, but don't wait for result
+                        # Set cache to fails, to writing to cache can be done in bulk
                         future = executor.submit(wordle_solver.best_guesses,
                             guess_group.copy(), new_solution_group, progress = False, mp = False, cache = False)
                         fs.append(future)
@@ -157,11 +158,7 @@ def main_mp(mp = True):
 
                         if len(fs) >= max_unsaved_jobs:
                             # Get results once completed
-                            for i in range(len(fs)):
-                                future = fs[i]
-                                result = rs[i]
-
-                                # Get result
+                            for future, result in zip(fs, rs):
                                 r, g, f = future.result()
                                 context.next_turn(guess, result)
                                 context._save_guesses_internal(r, g, f)
@@ -172,17 +169,13 @@ def main_mp(mp = True):
 
                             # Force save
                             context._save_guess_data()
+
                             # Reset futures
                             fs = []
                             rs = []
 
                 # Wait for all to complete
-                # Get results of completed once
-                for i in range(len(fs)):
-                    future = fs[i]
-                    result = rs[i]
-
-                    # Get result
+                for future, result in zip(fs, rs):
                     r, g, f = future.result()
                     context.next_turn(guess, result)
                     context._save_guesses_internal(r, g, f)
@@ -199,7 +192,7 @@ def main_mp(mp = True):
                 real_cache_results = set(context._cache_data[guess]["next_turn"])
             except KeyError:
                 # No results in cache, despite filling it
-                # Means the guess must be very good
+                # Means there are no previous cache entries for this guess
                 continue
 
             if cache_results != real_cache_results:
@@ -230,8 +223,8 @@ def main_mp(mp = True):
 if __name__ == "__main__":
     start = time.time()
     try:
-        main()
-        # main_mp()
+        # main()
+        main_mp()
     finally:
         stop = time.time()
         print(f"\nBuilt word cache in {duration_fmt(stop - start)}")
