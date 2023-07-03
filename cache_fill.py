@@ -4,6 +4,7 @@ Force generate cache for all game contexts
 import time
 import wordle_solver
 import wordle_contexts
+from wordle_utils import duration_fmt
 
 def main():
     # Go through all game contexts
@@ -229,4 +230,4 @@ if __name__ == "__main__":
         # main_mp()
     finally:
         stop = time.time()
-        print(f"Built word cache in {stop - start:.4f} secs")
+        print(f"\nBuilt word cache in {duration_fmt(stop - start)}")
