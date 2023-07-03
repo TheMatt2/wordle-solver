@@ -107,6 +107,10 @@ def main_mp(mp = True):
 
     max_unsaved_jobs = mp * 8
     for context in wordle_contexts.get_all_contexts():
+
+        # TODO: implement a better solution than hard coding id
+        if context == "flappy_birdle": continue
+
         print(f"Building cache for {'naive' if context.naive else 'smart'} {context.name} Length {context.word_length}")
 
         # Setup solver
