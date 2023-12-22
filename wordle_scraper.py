@@ -120,11 +120,11 @@ def scrap_wordlegame():
 
 def scrap_wordplay():
     # Wordplay does not actually expose the word list, or solutions
-    # March 2023, as both Wordplay and NYT are the only known Wordles
+    # March 2023, as both Wordplay and NYT are the only known unique word lists
     # that accept "seria" as a word, it is assumed wordplay shares
     # word list and solutions with NYT
     # Update: "olate" is not considered a valid word.
-    #    Which is consistant with the old NYT word list.
+    #    Which is consistent with the old NYT word list.
     #    There are no known word list that include "seria" but exclude "olate"
     #    Yet "tangy" is a solution.
     #    This seems to indicate the exact word list is different than any known.

@@ -129,8 +129,8 @@ class Context:
     letters = "abcdefghijklmnopqrstuvwxyz"
 
     def __init__(self, context_id, naive = False, word_length = None):
-        """Create context to descript a wordle game.
-        If word length is None, word length is infered from context.
+        """Create context to describe a wordle game.
+        If word length is None, word length is inferred from context.
         """
         self.context_id = context_id
 

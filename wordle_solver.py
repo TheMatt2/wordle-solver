@@ -100,7 +100,7 @@ class WordGroup(BaseWordGroup):
             # Optimized copy initializer
 
             # A copy is likely going to be modified
-            # and modifying using stats, so precompute stats
+            # and modifying using stats, so pre-compute stats
             word_list._prepare_stats()
 
             assert not word_list._changed, \
@@ -157,7 +157,7 @@ class WordGroup(BaseWordGroup):
             for index in range(self.context.word_length):
                 self._word_breakdown[index][word[index]].add(word)
 
-        # Make Word breakdown frozensets
+        # Make Word breakdown into frozensets
         for index in range(self.context.word_length):
             for letter in self.context.letters:
                 self._word_breakdown[index][letter] = frozenset(
@@ -170,7 +170,7 @@ class WordGroup(BaseWordGroup):
                 self._word_contains[letter].update(
                     self._word_breakdown[index][letter])
 
-        # Make Word contains frozensets
+        # Make word contains frozensets
         for letter in self.context.letters:
             self._word_contains[letter] = frozenset(self._word_contains[letter])
 
@@ -364,7 +364,7 @@ class SolutionGroup(BaseSolutionGroup):
     Use results learned from playing the game to refine possible solutions.
     """
     def filter_solutions(self, word, result):
-        """Remove solutions that are not consistant with word and result."""
+        """Remove solutions that are not consistent with word and result."""
         # Update statistics, if needed
         self._prepare_stats()
 
@@ -393,7 +393,7 @@ class SolutionGroup(BaseSolutionGroup):
         # Filter further for repeated letters
         for letter in set(word):
             if word.count(letter) > 1:
-                # A letter occurs multple times. Figure out the relationship it has with the solution
+                # A letter occurs multiple times. Figure out the relationship it has with the solution
                 absent_count = 0
                 present_count = 0
                 correct_count = 0

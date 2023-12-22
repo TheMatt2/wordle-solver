@@ -385,13 +385,13 @@ def chunked(iterable, n):
 
     # Slicing by steps [::n] seems to be faster
     # Use slicing instead if itertools.islice because the results need to pickle
-    # correctly. Unfortunely, a set object will change its order after pickling.
+    # correctly. Unfortunately, a set object will change its order after pickling.
     # This would render the chunked results useless.
     return [iterable[index::n] for index in range(n)]
 
 class filter_blacklist:
     """
-    generator to filter out items in a blacklist
+    Generator to filter out items in a blacklist
     Assumes that all members of the blacklist will occur once.
     Special case to help with handling solution processing.
     """

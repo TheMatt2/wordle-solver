@@ -3,7 +3,7 @@ import time
 import wordle_solver
 import wordle_contexts
 
-# Use coloring if avaliable
+# Use coloring if available
 try:
     from colorama import init, Back
 except ImportError:

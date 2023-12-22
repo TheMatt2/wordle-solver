@@ -105,7 +105,7 @@ def main():
             print("Success!")
             break
 
-        # Tell context word was guessed for cacheing to work
+        # Tell context word was guessed for caching to work
         context.next_turn(word, result)
 
         # Find number of words remaining
